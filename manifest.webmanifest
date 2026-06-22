@@ -1,0 +1,19 @@
+{
+  "name": "DG StoreFlow",
+  "short_name": "StoreFlow",
+  "description": "Daily store operations, schedule, inventory prep, photos, and team coordination.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f8f3",
+  "theme_color": "#f8d845",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

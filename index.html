@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f8d845" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="StoreFlow" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>DG StoreFlow</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="StoreFlow navigation">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">DG</div>
+          <div>
+            <h1>StoreFlow</h1>
+            <p>Daily operations</p>
+          </div>
+        </div>
+
+        <nav class="nav-list">
+          <button class="nav-item active" data-view="dashboard" type="button">
+            <span class="icon" aria-hidden="true">◎</span>
+            Dashboard
+          </button>
+          <button class="nav-item" data-view="tasks" type="button">
+            <span class="icon" aria-hidden="true">☑</span>
+            Tasks
+          </button>
+          <button class="nav-item" data-view="inventory" type="button">
+            <span class="icon" aria-hidden="true">▤</span>
+            Inventory
+          </button>
+          <button class="nav-item" data-view="schedule" type="button">
+            <span class="icon" aria-hidden="true">◷</span>
+            Schedule
+          </button>
+          <button class="nav-item" data-view="compass" type="button">
+            <span class="icon" aria-hidden="true">✦</span>
+            Compass
+          </button>
+          <button class="nav-item" data-view="photos" type="button">
+            <span class="icon" aria-hidden="true">▣</span>
+            Photos
+          </button>
+          <button class="nav-item" data-view="team" type="button">
+            <span class="icon" aria-hidden="true">◉</span>
+            Team
+          </button>
+        </nav>
+
+        <div class="store-card">
+          <span class="store-label">Store focus</span>
+          <strong>7-day workflow</strong>
+          <p>Compliance, training, planograms, resets, and shift direction in one place.</p>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow" id="todayLabel"></p>
+            <h2 id="pageTitle">Daily Command Center</h2>
+          </div>
+          <div class="top-actions">
+            <button class="secondary-button" id="seedButton" type="button">Reload Sample Data</button>
+            <button class="primary-button" id="openTaskModal" type="button">New Task</button>
+          </div>
+        </header>
+
+        <section class="view active" id="dashboardView" aria-labelledby="pageTitle">
+          <div class="hero-panel">
+            <div class="hero-copy">
+              <span class="status-pill" id="storeHealthPill">On Track</span>
+              <h3>Today’s operating plan</h3>
+              <p id="dailyBrief"></p>
+            </div>
+            <div class="store-visual" aria-label="Store workflow visual">
+              <div class="aisle frozen">Cooler</div>
+              <div class="aisle grocery">Core</div>
+              <div class="aisle seasonal">Seasonal</div>
+              <div class="aisle queue">Front</div>
+            </div>
+          </div>
+
+          <div class="metric-grid" id="metricGrid"></div>
+
+          <div class="content-grid">
+            <section class="panel">
+              <div class="panel-heading">
+                <h3>Priority Tasks</h3>
+                <button class="text-button" data-view-jump="tasks" type="button">View all</button>
+              </div>
+              <div class="task-list compact" id="priorityTaskList"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-heading">
+                <h3>Suggested Moves</h3>
+                <button class="text-button" id="refreshSuggestions" type="button">Refresh</button>
+              </div>
+              <div class="suggestion-list" id="suggestionList"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="tasksView">
+          <div class="filters">
+            <button class="filter-chip active" data-filter="all" type="button">All</button>
+            <button class="filter-chip" data-filter="compliance" type="button">Compliance</button>
+            <button class="filter-chip" data-filter="training" type="button">Training</button>
+            <button class="filter-chip" data-filter="planogram" type="button">Planograms</button>
+            <button class="filter-chip" data-filter="reset" type="button">Resets</button>
+            <button class="filter-chip" data-filter="inventory" type="button">Inventory</button>
+            <button class="filter-chip" data-filter="schedule" type="button">Schedule</button>
+          </div>
+          <div class="task-board" id="taskBoard"></div>
+        </section>
+
+        <section class="view" id="inventoryView">
+          <div class="inventory-layout">
+            <section class="panel">
+              <div class="panel-heading">
+                <h3>Inventory Prep</h3>
+                <button class="text-button" id="addInventoryPlan" type="button">Add prep plan</button>
+              </div>
+              <div class="inventory-summary" id="inventorySummary"></div>
+              <div class="task-list" id="inventoryTaskList"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-heading">
+                <h3>Reminders</h3>
+                <button class="text-button" id="addReminder" type="button">Add reminder</button>
+              </div>
+              <div class="reminder-list" id="reminderList"></div>
+            </section>
+
+            <section class="panel wide-panel">
+              <div class="panel-heading">
+                <h3>Productive Time</h3>
+              </div>
+              <div class="time-summary" id="timeSummary"></div>
+              <div class="time-log" id="timeLog"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="scheduleView">
+          <div class="schedule-layout">
+            <section class="panel schedule-planner-panel">
+              <div class="panel-heading">
+                <h3>Two-Week Schedule</h3>
+                <div class="segmented">
+                  <button class="filter-chip active" data-schedule-week="0" type="button">Week 1</button>
+                  <button class="filter-chip" data-schedule-week="1" type="button">Week 2</button>
+                </div>
+              </div>
+              <div class="schedule-stats" id="scheduleStats"></div>
+              <div class="schedule-grid" id="scheduleGrid"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-heading">
+                <h3>Today’s Coverage</h3>
+                <button class="text-button" id="addShift" type="button">Add shift</button>
+              </div>
+              <div class="schedule-list" id="scheduleList"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-heading">
+                <h3>Direction by Position</h3>
+              </div>
+              <div class="position-list" id="positionList"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="compassView">
+          <div class="compass-layout">
+            <section class="panel">
+              <div class="panel-heading">
+                <h3>Compass Notes</h3>
+                <button class="text-button" id="addCompassNote" type="button">Add note</button>
+              </div>
+              <div class="note-list" id="compassNotes"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-heading">
+                <h3>7-Day Workflow</h3>
+              </div>
+              <div class="workflow-list" id="workflowList"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="photosView">
+          <div class="photo-layout">
+            <section class="panel">
+              <div class="panel-heading">
+                <h3>Photo Intake</h3>
+              </div>
+              <form class="photo-form" id="photoForm">
+                <label>
+                  Photos
+                  <input id="photoInput" type="file" accept="image/*" multiple required />
+                </label>
+                <div class="two-col">
+                  <label>
+                    Category
+                    <select id="photoCategory">
+                      <option value="compass">Compass / Printout</option>
+                      <option value="schedule">Schedule</option>
+                      <option value="compliance">Compliance</option>
+                      <option value="planogram">Planogram / Reset</option>
+                      <option value="truck">Truck / Backroom</option>
+                      <option value="recovery">Recovery</option>
+                      <option value="training">Training</option>
+                    </select>
+                  </label>
+                  <label>
+                    Assign to
+                    <select id="photoOwner"></select>
+                  </label>
+                </div>
+                <label>
+                  Direction for team
+                  <textarea id="photoInstruction" rows="3" placeholder="Example: Use this Compass photo to set today’s T+4 priorities."></textarea>
+                </label>
+                <label class="check-row">
+                  <input id="photoCreateTask" type="checkbox" checked />
+                  Create a follow-up task and team message
+                </label>
+                <button class="primary-button" type="submit">Upload Photos</button>
+              </form>
+            </section>
+
+            <section class="panel">
+              <div class="panel-heading">
+                <h3>Recent Uploads</h3>
+                <button class="text-button" id="clearPhotos" type="button">Clear photos</button>
+              </div>
+              <div class="photo-grid" id="photoGrid"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="teamView">
+          <div class="team-layout">
+            <section class="panel">
+              <div class="panel-heading">
+                <h3>Team Messages</h3>
+              </div>
+              <form class="message-form" id="messageForm">
+                <input id="messageInput" type="text" placeholder="Send direction to the team..." autocomplete="off" />
+                <button class="primary-button" type="submit">Send</button>
+              </form>
+              <div class="message-list" id="messageList"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-heading">
+                <h3>Team Roster</h3>
+              </div>
+              <div class="roster-list" id="rosterList"></div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="taskModal">
+      <form method="dialog" class="modal-card" id="taskForm">
+        <div class="panel-heading">
+          <h3>Create Task</h3>
+          <button class="icon-button" value="cancel" aria-label="Close" type="submit">×</button>
+        </div>
+        <label>
+          Task
+          <input id="taskTitle" required maxlength="80" placeholder="Example: Complete safety walk" />
+        </label>
+        <div class="two-col">
+          <label>
+            Category
+            <select id="taskCategory">
+              <option value="compliance">Compliance</option>
+              <option value="training">Training</option>
+              <option value="planogram">Planogram</option>
+              <option value="reset">Reset</option>
+              <option value="truck">Truck</option>
+              <option value="inventory">Inventory</option>
+              <option value="schedule">Schedule</option>
+              <option value="customer">Customer</option>
+            </select>
+          </label>
+          <label>
+            Priority
+            <select id="taskPriority">
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </label>
+        </div>
+        <div class="two-col">
+          <label>
+            Owner
+            <select id="taskOwner"></select>
+          </label>
+          <label>
+            Due
+            <input id="taskDue" type="date" required />
+          </label>
+        </div>
+        <label>
+          Notes
+          <textarea id="taskNotes" rows="3" placeholder="Add clear direction, Compass reference, or location."></textarea>
+        </label>
+        <menu>
+          <button class="secondary-button" value="cancel" type="submit">Cancel</button>
+          <button class="primary-button" id="saveTask" value="default" type="submit">Save Task</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <script src="app.js"></script>
+  </body>
+</html>
