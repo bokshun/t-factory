@@ -7,6 +7,47 @@ const inventoryDate = '2026-06-25';
 const inventoryLabel = 'June 25, 2026';
 const scheduleStartDate = '2026-06-13';
 
+const currentLegionTeam = [
+  { id: 'team-chris-c', name: 'Chris C.', role: 'Store Manager', strength: 'workflow, inventory survey, audit monitoring' },
+  { id: 'team-sarah-h', name: 'Sarah H.', role: 'Assistant Store Manager', strength: 'sales floor recovery and opening prep' },
+  { id: 'team-jazmin-g', name: 'Jazmin G.', role: 'Sales Associate', strength: 'register coverage and cooler/freezer prep' },
+  { id: 'team-alicia-t', name: 'Alicia T.', role: 'Sales Associate', strength: 'front end, receiving room, and checklist support' },
+  { id: 'team-asael-h', name: 'Asael H.', role: 'Sales Associate', strength: 'closing recovery and sales floor blocking' },
+  { id: 'team-elvis-j', name: 'Elvis J.', role: 'Sales Associate', strength: 'freight, recovery, and sky shelf prep' },
+  { id: 'team-louis-c', name: 'Louis C.', role: 'Sales Associate', strength: 'stocking, recovery, and core freight' },
+  { id: 'team-jeff-h', name: 'Jeff H.', role: 'Sales Associate', strength: 'closing coverage and recovery' },
+  { id: 'team-carlton-r', name: 'Carlton R.', role: 'Sales Associate', strength: 'recovery, sky shelves, and stocking' },
+  { id: 'team-blaire-m', name: 'Blaire M.', role: 'Sales Associate', strength: 'register, totes, and closing coverage' }
+];
+
+const inventoryChecklistTemplates = [
+  ['T-10 Pre-Inventory Survey', 'Verify restroom works, store temp is 60–80°, no pest issues, and maintenance concerns are reported early.'],
+  ['T-10 Count MMCs and U-boats', 'Count receiving room MMCs, sales floor MMCs, estimated unworked MMCs, U-boats, rolltainers, and sky shelves.'],
+  ['Receiving Room: DC labels facing out', 'Stage rolltainers with DC labels turned outward and keep receiving room organized for count access.'],
+  ['Receiving Room: separate product correctly', 'Separate sealed DC cartons, liquids/shrink-wrapped items on U-boats, open boxes in MMC area, and MMCs staged together.'],
+  ['Safety: no rolltainers above 9 feet', 'Correct any rolltainer stacked above 9 feet before inventory service arrives.'],
+  ['Sales Floor: deep recover by unique UPC', 'Check same UPC front to back, fallen merchandise, behind pushers, and push back or block as appropriate.'],
+  ['Pegged sections: flip first item on peg', 'Expose UPC/barcode in hardware, automotive, crafts, stationery, hair accessories, and cosmetics.'],
+  ['Pushers: check hidden product', 'Check medicine, vitamins, tobacco, and deodorant pushers for fallen or hidden product.'],
+  ['Blocked product: verify backfacing', 'Nuts, trash bags, canned food, bar soap, toothpaste, canned pet food, dental, and analgesics must be blocked/backfaced correctly.'],
+  ['Sky shelves: one UPC per facing', 'Recover every sky shelf to one UPC per facing. Do not duck product behind neighboring facings.'],
+  ['Sky shelves: bring down MMCs/AQ1', 'Night before inventory, bring down all MMCs and AQ1 merchandise from sky shelves after close.'],
+  ['Cooler/freezer prep', 'Prep cooler and freezer with one UPC per facing; group matching UPCs together if space is tight.'],
+  ['PRP: sealed and labeled', 'PRP must be sealed in boxes with PRP labels attached and facing outward to be DNI.'],
+  ['DNI setup and signage', 'Post DNI-AQ1 signs and confirm DNI areas/items are not counted incorrectly.'],
+  ['Damages processed before inventory', 'Process damages before inventory day; inventory service does not count damaged merchandise.'],
+  ['Inventory Day: audit mode', 'Begin audits early, work all audits, and check counter accuracy hourly using the audit summary report.'],
+  ['Inventory Day: recovery after completion', 'Begin recovery immediately after inventory completion.']
+];
+
+const inventoryReadinessSections = [
+  ['Receiving Room', ['DC labels facing out', 'Liquids/shrink wrap staged', 'MMCs staged', 'No loose product', 'No over-9ft rolltainers']],
+  ['Sales Floor', ['Deep recovery', 'One UPC per facing', 'Pegged sections flipped', 'Pushers checked', 'Blocked product backfaced']],
+  ['Sky Shelves', ['One UPC per facing', 'No ducking', 'MMCs/AQ1 brought down', 'PDQs prepared']],
+  ['Cooler / Freezer', ['One UPC per facing', 'Same UPC grouped', 'Silver cart plan ready']],
+  ['DNI / Inventory Day', ['DNI signs posted', 'PRP sealed/labeled', 'Damages processed', 'Audits monitored']]
+];
+
 const sevenDayWorkflow = [
   {
     day: 'Saturday',
@@ -84,12 +125,7 @@ const dailyActivities = [
 ];
 
 const sampleState = {
-  team: [
-    { id: 't1', name: 'Chris', role: 'Store Manager', strength: 'workflow and compliance' },
-    { id: 't2', name: 'Maya', role: 'Lead Sales Associate', strength: 'front end and training' },
-    { id: 't3', name: 'Jordan', role: 'Sales Associate', strength: 'stocking and recovery' },
-    { id: 't4', name: 'Devin', role: 'Sales Associate', strength: 'cooler and resets' }
-  ],
+  team: structuredClone(currentLegionTeam),
   tasks: [
     {
       id: 'task-1',
@@ -455,6 +491,8 @@ function bindEvents() {
 
   document.querySelector('#addReminder').addEventListener('click', addInventoryReminder);
   document.querySelector('#addInventoryPlan').addEventListener('click', addInventoryPrepPlan);
+  document.querySelector('#addInventoryChecklist')?.addEventListener('click', addFullInventoryChecklist);
+  document.querySelector('#importRosterFromSchedule')?.addEventListener('click', importRosterFromSchedulePhoto);
 }
 
 function setView(viewName) {
@@ -492,6 +530,55 @@ function createTask() {
   });
   document.querySelector('#taskForm').reset();
   document.querySelector('#taskModal').close();
+  saveState();
+  render();
+}
+
+
+function addFullInventoryChecklist() {
+  const existingTitles = new Set(state.tasks.map((task) => task.title));
+  const owners = state.team.length ? state.team : currentLegionTeam;
+  inventoryChecklistTemplates.forEach(([title, notes], index) => {
+    if (existingTitles.has(title)) return;
+    state.tasks.push({
+      id: crypto.randomUUID(),
+      title,
+      category: 'inventory',
+      priority: index < 5 || title.includes('Inventory Day') ? 'high' : 'medium',
+      owner: owners[index % owners.length]?.name || 'Chris C.',
+      due: getInventoryDueDate(title),
+      notes,
+      done: false
+    });
+  });
+  state.reminders.unshift({
+    id: crypto.randomUUID(),
+    title: 'Inventory Command Center loaded',
+    due: isoToday,
+    owner: 'Chris C.',
+    notes: 'Full DG inventory checklist was added from the uploaded field guide pages.',
+    done: false
+  });
+  saveState();
+  render();
+}
+
+function getInventoryDueDate(title) {
+  if (title.startsWith('T-10')) return addDaysToDate(inventoryDate, -10);
+  if (title.startsWith('T-3') || title.includes('deep recover')) return addDaysToDate(inventoryDate, -3);
+  if (title.includes('Night before') || title.includes('Sky shelves: bring') || title.includes('Inventory Day') === false && (title.includes('DNI') || title.includes('Damages') || title.includes('PRP'))) return addDaysToDate(inventoryDate, -1);
+  if (title.includes('Inventory Day')) return inventoryDate;
+  return addDaysToDate(inventoryDate, -7);
+}
+
+function importRosterFromSchedulePhoto() {
+  state.team = structuredClone(currentLegionTeam);
+  state.messages.unshift({
+    id: crypto.randomUUID(),
+    from: 'Chris',
+    body: 'Roster updated from the Legion schedule upload. Ex-employees were removed and only the scheduled team is showing.',
+    time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  });
   saveState();
   render();
 }
@@ -551,6 +638,33 @@ async function handlePhotoUpload(event) {
       dataUrl: await resizeImageFile(file)
     };
     state.photos.unshift(photo);
+
+    if (category === 'schedule') {
+      state.team = structuredClone(currentLegionTeam);
+      state.messages.unshift({
+        id: crypto.randomUUID(),
+        from: 'Chris',
+        body: 'Schedule photo uploaded: roster was refreshed from the current Legion schedule team.',
+        time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+        photoId: photo.id
+      });
+    }
+
+    if (category === 'inventory') {
+      inventoryChecklistTemplates.slice(0, 6).forEach(([title, notes], index) => {
+        state.tasks.unshift({
+          id: crypto.randomUUID(),
+          title,
+          category: 'inventory',
+          priority: 'high',
+          owner: state.team[index % state.team.length]?.name || owner,
+          due: getInventoryDueDate(title),
+          notes: `${notes} Created from uploaded inventory guide photo: ${file.name}`,
+          photoId: photo.id,
+          done: false
+        });
+      });
+    }
 
     if (shouldCreateTask) {
       state.tasks.unshift({
@@ -805,6 +919,17 @@ function renderInventory() {
       <span class="store-label">Inventory date</span>
       <strong>${inventoryLabel}</strong>
       <p>${daysLeft} day${daysLeft === 1 ? '' : 's'} left. ${openInventory} inventory prep task${openInventory === 1 ? '' : 's'} still open. ${dueReminders} reminder${dueReminders === 1 ? '' : 's'} due now.</p>
+    </article>
+    <article class="inventory-command">
+      <strong>Inventory Command Center</strong>
+      <div class="readiness-grid">
+        ${inventoryReadinessSections.map(([section, checks]) => `
+          <div class="readiness-card">
+            <strong>${section}</strong>
+            <ul>${checks.map((check) => `<li>${check}</li>`).join('')}</ul>
+          </div>
+        `).join('')}
+      </div>
     </article>
   `;
 
@@ -1172,15 +1297,33 @@ function renderMessages() {
 }
 
 function renderRoster() {
+  const scheduleStats = getScheduleRosterStats();
   document.querySelector('#rosterList').innerHTML = state.team
-    .map((member) => `
+    .map((member) => {
+      const stats = scheduleStats.get(member.name) || { hours: 0, shifts: 0, next: 'No upcoming shift found' };
+      return `
       <article class="person">
         <strong>${escapeHtml(member.name)}</strong>
-        <div class="task-meta">${escapeHtml(member.role)}</div>
+        <div class="task-meta">${escapeHtml(member.role)} · ${stats.shifts} shift${stats.shifts === 1 ? '' : 's'} · ${stats.hours.toFixed(1)} hrs</div>
+        <div class="subtle">Next: ${escapeHtml(stats.next)}</div>
         <div class="subtle">Best for ${escapeHtml(member.strength)}.</div>
       </article>
-    `)
+    `;
+    })
     .join('');
+}
+
+function getScheduleRosterStats() {
+  const stats = new Map();
+  state.schedule.forEach((shift) => {
+    const current = stats.get(shift.name) || { hours: 0, shifts: 0, next: '' };
+    current.hours += shiftMinutes(shift) / 60;
+    current.shifts += 1;
+    const nextLabel = `${formatDue(shift.date)} ${formatTime(shift.start)}-${formatTime(shift.end)}`;
+    if (!current.next || shift.date >= isoToday) current.next = nextLabel;
+    stats.set(shift.name, current);
+  });
+  return stats;
 }
 
 function capitalize(value) {

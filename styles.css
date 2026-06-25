@@ -954,3 +954,9 @@ menu {
     gap: 4px;
   }
 }
+
+.inventory-command { margin-top: 1rem; }
+.readiness-grid { display: grid; gap: .75rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-top: .75rem; }
+.readiness-card { border: 1px solid rgba(255,255,255,.12); border-radius: 14px; padding: .8rem; background: rgba(255,255,255,.04); }
+.readiness-card ul { margin: .5rem 0 0; padding-left: 1.1rem; }
+.readiness-card li { margin: .25rem 0; color: var(--muted); font-size: .88rem; }

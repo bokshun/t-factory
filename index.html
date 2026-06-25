@@ -126,6 +126,7 @@
             <section class="panel">
               <div class="panel-heading">
                 <h3>Inventory Prep</h3>
+                <button class="text-button" id="addInventoryChecklist" type="button">Load DG checklist</button>
                 <button class="text-button" id="addInventoryPlan" type="button">Add prep plan</button>
               </div>
               <div class="inventory-summary" id="inventorySummary"></div>
@@ -214,7 +215,8 @@
                     Category
                     <select id="photoCategory">
                       <option value="compass">Compass / Printout</option>
-                      <option value="schedule">Schedule</option>
+                      <option value="schedule">Schedule / Legion Roster</option>
+                      <option value="inventory">Inventory Guide / Prep</option>
                       <option value="compliance">Compliance</option>
                       <option value="planogram">Planogram / Reset</option>
                       <option value="truck">Truck / Backroom</option>
@@ -264,6 +266,7 @@
             <section class="panel">
               <div class="panel-heading">
                 <h3>Team Roster</h3>
+                <button class="text-button" id="importRosterFromSchedule" type="button">Import from schedule</button>
               </div>
               <div class="roster-list" id="rosterList"></div>
             </section>
@@ -292,7 +295,8 @@
               <option value="reset">Reset</option>
               <option value="truck">Truck</option>
               <option value="inventory">Inventory</option>
-              <option value="schedule">Schedule</option>
+              <option value="schedule">Schedule / Legion Roster</option>
+                      <option value="inventory">Inventory Guide / Prep</option>
               <option value="customer">Customer</option>
             </select>
           </label>
