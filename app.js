@@ -1,4 +1,5 @@
 const storageKey = 'dg-storeflow-state-v1';
+const appVersion = '2026.06.25.2';
 
 const today = new Date();
 const isoToday = today.toISOString().slice(0, 10);
@@ -6,47 +7,6 @@ const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frida
 const inventoryDate = '2026-06-25';
 const inventoryLabel = 'June 25, 2026';
 const scheduleStartDate = '2026-06-13';
-
-const currentLegionTeam = [
-  { id: 'team-chris-c', name: 'Chris C.', role: 'Store Manager', strength: 'workflow, inventory survey, audit monitoring' },
-  { id: 'team-sarah-h', name: 'Sarah H.', role: 'Assistant Store Manager', strength: 'sales floor recovery and opening prep' },
-  { id: 'team-jazmin-g', name: 'Jazmin G.', role: 'Sales Associate', strength: 'register coverage and cooler/freezer prep' },
-  { id: 'team-alicia-t', name: 'Alicia T.', role: 'Sales Associate', strength: 'front end, receiving room, and checklist support' },
-  { id: 'team-asael-h', name: 'Asael H.', role: 'Sales Associate', strength: 'closing recovery and sales floor blocking' },
-  { id: 'team-elvis-j', name: 'Elvis J.', role: 'Sales Associate', strength: 'freight, recovery, and sky shelf prep' },
-  { id: 'team-louis-c', name: 'Louis C.', role: 'Sales Associate', strength: 'stocking, recovery, and core freight' },
-  { id: 'team-jeff-h', name: 'Jeff H.', role: 'Sales Associate', strength: 'closing coverage and recovery' },
-  { id: 'team-carlton-r', name: 'Carlton R.', role: 'Sales Associate', strength: 'recovery, sky shelves, and stocking' },
-  { id: 'team-blaire-m', name: 'Blaire M.', role: 'Sales Associate', strength: 'register, totes, and closing coverage' }
-];
-
-const inventoryChecklistTemplates = [
-  ['T-10 Pre-Inventory Survey', 'Verify restroom works, store temp is 60–80°, no pest issues, and maintenance concerns are reported early.'],
-  ['T-10 Count MMCs and U-boats', 'Count receiving room MMCs, sales floor MMCs, estimated unworked MMCs, U-boats, rolltainers, and sky shelves.'],
-  ['Receiving Room: DC labels facing out', 'Stage rolltainers with DC labels turned outward and keep receiving room organized for count access.'],
-  ['Receiving Room: separate product correctly', 'Separate sealed DC cartons, liquids/shrink-wrapped items on U-boats, open boxes in MMC area, and MMCs staged together.'],
-  ['Safety: no rolltainers above 9 feet', 'Correct any rolltainer stacked above 9 feet before inventory service arrives.'],
-  ['Sales Floor: deep recover by unique UPC', 'Check same UPC front to back, fallen merchandise, behind pushers, and push back or block as appropriate.'],
-  ['Pegged sections: flip first item on peg', 'Expose UPC/barcode in hardware, automotive, crafts, stationery, hair accessories, and cosmetics.'],
-  ['Pushers: check hidden product', 'Check medicine, vitamins, tobacco, and deodorant pushers for fallen or hidden product.'],
-  ['Blocked product: verify backfacing', 'Nuts, trash bags, canned food, bar soap, toothpaste, canned pet food, dental, and analgesics must be blocked/backfaced correctly.'],
-  ['Sky shelves: one UPC per facing', 'Recover every sky shelf to one UPC per facing. Do not duck product behind neighboring facings.'],
-  ['Sky shelves: bring down MMCs/AQ1', 'Night before inventory, bring down all MMCs and AQ1 merchandise from sky shelves after close.'],
-  ['Cooler/freezer prep', 'Prep cooler and freezer with one UPC per facing; group matching UPCs together if space is tight.'],
-  ['PRP: sealed and labeled', 'PRP must be sealed in boxes with PRP labels attached and facing outward to be DNI.'],
-  ['DNI setup and signage', 'Post DNI-AQ1 signs and confirm DNI areas/items are not counted incorrectly.'],
-  ['Damages processed before inventory', 'Process damages before inventory day; inventory service does not count damaged merchandise.'],
-  ['Inventory Day: audit mode', 'Begin audits early, work all audits, and check counter accuracy hourly using the audit summary report.'],
-  ['Inventory Day: recovery after completion', 'Begin recovery immediately after inventory completion.']
-];
-
-const inventoryReadinessSections = [
-  ['Receiving Room', ['DC labels facing out', 'Liquids/shrink wrap staged', 'MMCs staged', 'No loose product', 'No over-9ft rolltainers']],
-  ['Sales Floor', ['Deep recovery', 'One UPC per facing', 'Pegged sections flipped', 'Pushers checked', 'Blocked product backfaced']],
-  ['Sky Shelves', ['One UPC per facing', 'No ducking', 'MMCs/AQ1 brought down', 'PDQs prepared']],
-  ['Cooler / Freezer', ['One UPC per facing', 'Same UPC grouped', 'Silver cart plan ready']],
-  ['DNI / Inventory Day', ['DNI signs posted', 'PRP sealed/labeled', 'Damages processed', 'Audits monitored']]
-];
 
 const sevenDayWorkflow = [
   {
@@ -125,14 +85,25 @@ const dailyActivities = [
 ];
 
 const sampleState = {
-  team: structuredClone(currentLegionTeam),
+  team: [
+    { id: 't1', name: 'Chris C.', role: 'Store Manager', strength: 'workflow and compliance' },
+    { id: 't2', name: 'Sarah I.', role: 'Assistant Store Manager', strength: 'opening manager and compliance' },
+    { id: 't3', name: 'Alicia T.', role: 'Sales Associate', strength: 'front end and customer coverage' },
+    { id: 't4', name: 'Blaire M.', role: 'Sales Associate', strength: 'stocking and closing coverage' },
+    { id: 't5', name: 'Elvis J.', role: 'Sales Associate', strength: 'recovery and closing' },
+    { id: 't6', name: 'Louis C.', role: 'Sales Associate', strength: 'core freight and sales floor support' },
+    { id: 't7', name: 'Carlton R.', role: 'Sales Associate', strength: 'recovery and planogram support' },
+    { id: 't8', name: 'Jazmin G.', role: 'Sales Associate', strength: 'register and truck support' },
+    { id: 't9', name: 'Jeff H.', role: 'Sales Associate', strength: 'closing coverage' },
+    { id: 't10', name: 'Asael H.', role: 'Sales Associate', strength: 'closing coverage' }
+  ],
   tasks: [
     {
       id: 'task-1',
       title: 'Review Compass updates and post shift priorities',
       category: 'compliance',
       priority: 'high',
-      owner: 'Chris',
+      owner: 'Chris C.',
       due: isoToday,
       notes: 'Pull daily and weekly notes, then turn them into short position directions.',
       done: false
@@ -142,7 +113,7 @@ const sampleState = {
       title: 'Complete safety walk and temperature checks',
       category: 'compliance',
       priority: 'high',
-      owner: 'Maya',
+      owner: 'Sarah I.',
       due: isoToday,
       notes: 'Log issues before noon and assign fixes immediately.',
       done: false
@@ -152,7 +123,7 @@ const sampleState = {
       title: 'Finish CBL training follow-up',
       category: 'training',
       priority: 'medium',
-      owner: 'Jordan',
+      owner: 'Jazmin G.',
       due: isoToday,
       notes: 'Check required modules and confirm completion before end of shift.',
       done: false
@@ -162,7 +133,7 @@ const sampleState = {
       title: 'Set POG sky shelves',
       category: 'planogram',
       priority: 'medium',
-      owner: 'Devin',
+      owner: 'Carlton R.',
       due: addDays(1),
       notes: 'Tuesday T+4 workflow: set POG sky shelves and confirm labels.',
       done: false
@@ -172,7 +143,7 @@ const sampleState = {
       title: 'Daily recovery 5:00 p.m. to close',
       category: 'reset',
       priority: 'low',
-      owner: 'Chris',
+      owner: 'Chris C.',
       due: addDays(2),
       notes: 'Full store recovery every night; keep first 30 feet clean all day.',
       done: true
@@ -182,7 +153,7 @@ const sampleState = {
       title: 'Inventory prep: recover and clean first 30 feet',
       category: 'inventory',
       priority: 'high',
-      owner: 'Maya',
+      owner: 'Alicia T.',
       due: addDays(1),
       notes: 'Front end, checkout, seasonal entry, and high-traffic areas must stay faced and clean.',
       done: false
@@ -192,7 +163,7 @@ const sampleState = {
       title: 'Inventory prep: backroom and rolltainer count readiness',
       category: 'inventory',
       priority: 'high',
-      owner: 'Jordan',
+      owner: 'Blaire M.',
       due: addDays(2),
       notes: 'Stage, organize, and label problem areas so the team can count cleanly on inventory day.',
       done: false
@@ -202,26 +173,27 @@ const sampleState = {
       title: 'Inventory prep: damages, nones, tons, and dry damages',
       category: 'inventory',
       priority: 'high',
-      owner: 'Chris',
+      owner: 'Chris C.',
       due: addDays(3),
       notes: 'Clear product that should not be counted as sellable and document follow-up.',
       done: false
     }
   ],
   schedule: buildSampleSchedule(),
+  schedulePdfs: [],
   compassNotes: [
     { id: 'c1', title: '7-day setup', body: 'T-Day is Friday. P-Day is Tuesday. Pre-open stocking is yes. Dedicated delivery store is no.' },
     { id: 'c2', title: 'Daily reminder', body: 'Assign one owner per workflow task and check progress before shift change.' }
   ],
   messages: [
-    { id: 'm1', from: 'Chris', body: 'Morning focus: compliance first, then training, then seasonal reset progress.', time: '7:12 AM' },
-    { id: 'm2', from: 'Maya', body: 'Safety walk started. I will update once temperature checks are logged.', time: '8:06 AM' }
+    { id: 'm1', from: 'Chris C.', body: 'Morning focus: compliance first, then training, then seasonal reset progress.', time: '7:12 AM' },
+    { id: 'm2', from: 'Sarah I.', body: 'Safety walk started. I will update once temperature checks are logged.', time: '8:06 AM' }
   ],
   photos: [],
   reminders: [
-    { id: 'r1', title: 'Inventory countdown check', due: isoToday, owner: 'Chris', notes: 'Review open inventory prep tasks and assign each one before shift change.', done: false },
-    { id: 'r2', title: 'Backroom readiness check', due: addDays(2), owner: 'Jordan', notes: 'Confirm rolltainers, totes, and staged freight are organized for counting.', done: false },
-    { id: 'r3', title: 'Final sales floor recovery push', due: '2026-06-24', owner: 'Maya', notes: 'Full store recovery before inventory day on June 25, 2026.', done: false }
+    { id: 'r1', title: 'Inventory countdown check', due: isoToday, owner: 'Chris C.', notes: 'Review open inventory prep tasks and assign each one before shift change.', done: false },
+    { id: 'r2', title: 'Backroom readiness check', due: addDays(2), owner: 'Blaire M.', notes: 'Confirm rolltainers, totes, and staged freight are organized for counting.', done: false },
+    { id: 'r3', title: 'Final sales floor recovery push', due: '2026-06-24', owner: 'Sarah I.', notes: 'Full store recovery before inventory day on June 25, 2026.', done: false }
   ],
   timeEntries: [],
   activeTimer: null
@@ -229,7 +201,7 @@ const sampleState = {
 
 let state = loadState();
 let activeFilter = 'all';
-let activeScheduleWeek = 0;
+let activeScheduleWeek = getCurrentScheduleWeek();
 
 const views = {
   dashboard: document.querySelector('#dashboardView'),
@@ -252,11 +224,13 @@ const pageTitles = {
 };
 
 document.querySelector('#todayLabel').textContent = `${dayNames[today.getDay()]}, ${today.toLocaleDateString()}`;
+document.querySelector('#appVersionLabel').textContent = `Updated build ${appVersion}`;
 document.querySelector('#taskDue').value = isoToday;
 
 bindEvents();
 render();
 registerServiceWorker();
+clearOldAppCaches();
 
 function addDays(days) {
   const date = new Date();
@@ -268,6 +242,13 @@ function addDaysToDate(value, days) {
   const date = new Date(`${value}T12:00:00`);
   date.setDate(date.getDate() + days);
   return date.toISOString().slice(0, 10);
+}
+
+function getCurrentScheduleWeek() {
+  const current = new Date(`${isoToday}T12:00:00`);
+  const start = new Date(`${scheduleStartDate}T12:00:00`);
+  const offset = Math.floor((current - start) / (7 * 86400000));
+  return Math.min(1, Math.max(0, offset));
 }
 
 function buildSampleSchedule() {
@@ -329,19 +310,28 @@ function buildSampleSchedule() {
 }
 
 function normalizeSchedule(schedule) {
-  return schedule.map((shift, index) => {
-    if (shift.date && shift.start && shift.end) return shift;
-    const [start, end] = parseShiftTime(shift.time || '9:00 AM - 1:00 PM');
-    return {
-      id: shift.id || `s-normalized-${index}`,
-      date: shift.date || isoToday,
-      name: shift.name,
-      position: shift.position,
-      start,
-      end,
-      direction: shift.direction || 'Add shift direction based on store needs.'
-    };
-  });
+  return schedule
+    .filter((shift) => shift && shift.name)
+    .map((shift, index) => {
+      if (shift.date && shift.start && shift.end) {
+        return {
+          ...shift,
+          id: shift.id || `s-normalized-${index}`,
+          position: shift.position || 'Assigned Coverage',
+          direction: shift.direction || 'Add shift direction based on store needs.'
+        };
+      }
+      const [start, end] = parseShiftTime(shift.time || '9:00 AM - 1:00 PM');
+      return {
+        id: shift.id || `s-normalized-${index}`,
+        date: shift.date || isoToday,
+        name: shift.name,
+        position: shift.position || 'Assigned Coverage',
+        start,
+        end,
+        direction: shift.direction || 'Add shift direction based on store needs.'
+      };
+    });
 }
 
 function parseShiftTime(value) {
@@ -372,12 +362,13 @@ function loadState() {
 }
 
 function normalizeState(savedState) {
-  return {
+  const merged = {
     ...structuredClone(sampleState),
     ...savedState,
-    team: savedState.team || sampleState.team,
+    team: sampleState.team,
     tasks: savedState.tasks || sampleState.tasks,
     schedule: normalizeSchedule(savedState.schedule || sampleState.schedule),
+    schedulePdfs: savedState.schedulePdfs || [],
     compassNotes: savedState.compassNotes || sampleState.compassNotes,
     messages: savedState.messages || sampleState.messages,
     photos: savedState.photos || [],
@@ -385,17 +376,91 @@ function normalizeState(savedState) {
     timeEntries: savedState.timeEntries || [],
     activeTimer: savedState.activeTimer || null
   };
+  migratePlaceholderNames(merged);
+  return merged;
+}
+
+function migratePlaceholderNames(targetState) {
+  const replacements = {
+    Maya: 'Sarah I.',
+    Jordan: 'Jazmin G.',
+    Devin: 'Carlton R.',
+    Chris: 'Chris C.'
+  };
+
+  const replaceName = (value) => replacements[value] || value;
+  const replaceText = (value) => {
+    if (!value) return value;
+    return Object.entries(replacements).reduce(
+      (text, [from, to]) => text.replaceAll(`${from}:`, `${to}:`).replaceAll(from, to),
+      value
+    );
+  };
+
+  targetState.tasks = targetState.tasks.map((task) => ({
+    ...task,
+    owner: replaceName(task.owner),
+    notes: replaceText(task.notes)
+  }));
+
+  targetState.reminders = targetState.reminders.map((reminder) => ({
+    ...reminder,
+    owner: replaceName(reminder.owner),
+    notes: replaceText(reminder.notes)
+  }));
+
+  targetState.messages = targetState.messages.map((message) => ({
+    ...message,
+    from: replaceName(message.from),
+    body: replaceText(message.body)
+  }));
+
+  targetState.photos = targetState.photos.map((photo) => ({
+    ...photo,
+    owner: replaceName(photo.owner),
+    instruction: replaceText(photo.instruction)
+  }));
+
+  targetState.schedule = targetState.schedule.map((shift) => ({
+    ...shift,
+    name: replaceName(shift.name),
+    direction: replaceText(shift.direction)
+  }));
+
+  targetState.timeEntries = targetState.timeEntries.map((entry) => ({
+    ...entry,
+    owner: replaceName(entry.owner)
+  }));
 }
 
 function saveState() {
-  localStorage.setItem(storageKey, JSON.stringify(state));
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(state));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./service-worker.js').catch(() => {});
+    navigator.serviceWorker.register(`./service-worker.js?v=${appVersion}`).catch(() => {});
   });
+}
+
+function clearOldAppCaches() {
+  if (!('caches' in window)) return;
+  caches
+    .keys()
+    .then((keys) =>
+      Promise.all(
+        keys
+          .filter((key) => key.startsWith('dg-storeflow-') && key !== 'dg-storeflow-v5')
+          .map((key) => caches.delete(key))
+      )
+    )
+    .catch(() => {});
 }
 
 function bindEvents() {
@@ -426,11 +491,9 @@ function bindEvents() {
   });
 
   document.querySelector('#openTaskModal').addEventListener('click', openTaskDialog);
-  document.querySelector('#refreshSuggestions').addEventListener('click', renderSuggestions);
-  document.querySelector('#seedButton').addEventListener('click', () => {
-    state = structuredClone(sampleState);
-    saveState();
-    render();
+  document.querySelector('#refreshSuggestions').addEventListener('click', () => {
+    renderSuggestions();
+    document.querySelector('#refreshSuggestions').textContent = 'Updated just now';
   });
 
   document.querySelector('#taskForm').addEventListener('submit', (event) => {
@@ -447,7 +510,7 @@ function bindEvents() {
     if (!body) return;
     state.messages.unshift({
       id: crypto.randomUUID(),
-      from: 'Chris',
+      from: 'Chris C.',
       body,
       time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
     });
@@ -457,7 +520,8 @@ function bindEvents() {
   });
 
   document.querySelector('#addShift').addEventListener('click', () => {
-    const next = state.team[state.schedule.length % state.team.length];
+    const roster = getRosterFromSchedule();
+    const next = roster[state.schedule.length % roster.length] || getFallbackOwner();
     const date = addDaysToDate(scheduleStartDate, activeScheduleWeek * 7);
     state.schedule.push({
       id: crypto.randomUUID(),
@@ -491,8 +555,12 @@ function bindEvents() {
 
   document.querySelector('#addReminder').addEventListener('click', addInventoryReminder);
   document.querySelector('#addInventoryPlan').addEventListener('click', addInventoryPrepPlan);
-  document.querySelector('#addInventoryChecklist')?.addEventListener('click', addFullInventoryChecklist);
-  document.querySelector('#importRosterFromSchedule')?.addEventListener('click', importRosterFromSchedulePhoto);
+  document.querySelector('#schedulePdfForm').addEventListener('submit', handleSchedulePdfUpload);
+  document.querySelector('#clearSchedulePdfs').addEventListener('click', () => {
+    state.schedulePdfs = [];
+    saveState();
+    renderSchedulePdfs();
+  });
 }
 
 function setView(viewName) {
@@ -506,13 +574,21 @@ function setView(viewName) {
 
 function openTaskDialog() {
   const ownerSelect = document.querySelector('#taskOwner');
-  ownerSelect.innerHTML = state.team.map((member) => `<option value="${member.name}">${member.name}</option>`).join('');
+  ownerSelect.innerHTML = getRosterFromSchedule()
+    .map((member) => `<option value="${member.name}">${member.name}</option>`)
+    .join('');
   document.querySelector('#taskDue').value = isoToday;
   document.querySelector('#taskModal').showModal();
 }
 
 function populatePhotoOwners() {
-  document.querySelector('#photoOwner').innerHTML = state.team
+  document.querySelector('#photoOwner').innerHTML = getRosterFromSchedule()
+    .map((member) => `<option value="${member.name}">${member.name}</option>`)
+    .join('');
+}
+
+function populateSchedulePdfOwners() {
+  document.querySelector('#schedulePdfOwner').innerHTML = getRosterFromSchedule()
     .map((member) => `<option value="${member.name}">${member.name}</option>`)
     .join('');
 }
@@ -534,61 +610,12 @@ function createTask() {
   render();
 }
 
-
-function addFullInventoryChecklist() {
-  const existingTitles = new Set(state.tasks.map((task) => task.title));
-  const owners = state.team.length ? state.team : currentLegionTeam;
-  inventoryChecklistTemplates.forEach(([title, notes], index) => {
-    if (existingTitles.has(title)) return;
-    state.tasks.push({
-      id: crypto.randomUUID(),
-      title,
-      category: 'inventory',
-      priority: index < 5 || title.includes('Inventory Day') ? 'high' : 'medium',
-      owner: owners[index % owners.length]?.name || 'Chris C.',
-      due: getInventoryDueDate(title),
-      notes,
-      done: false
-    });
-  });
-  state.reminders.unshift({
-    id: crypto.randomUUID(),
-    title: 'Inventory Command Center loaded',
-    due: isoToday,
-    owner: 'Chris C.',
-    notes: 'Full DG inventory checklist was added from the uploaded field guide pages.',
-    done: false
-  });
-  saveState();
-  render();
-}
-
-function getInventoryDueDate(title) {
-  if (title.startsWith('T-10')) return addDaysToDate(inventoryDate, -10);
-  if (title.startsWith('T-3') || title.includes('deep recover')) return addDaysToDate(inventoryDate, -3);
-  if (title.includes('Night before') || title.includes('Sky shelves: bring') || title.includes('Inventory Day') === false && (title.includes('DNI') || title.includes('Damages') || title.includes('PRP'))) return addDaysToDate(inventoryDate, -1);
-  if (title.includes('Inventory Day')) return inventoryDate;
-  return addDaysToDate(inventoryDate, -7);
-}
-
-function importRosterFromSchedulePhoto() {
-  state.team = structuredClone(currentLegionTeam);
-  state.messages.unshift({
-    id: crypto.randomUUID(),
-    from: 'Chris',
-    body: 'Roster updated from the Legion schedule upload. Ex-employees were removed and only the scheduled team is showing.',
-    time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-  });
-  saveState();
-  render();
-}
-
 function addInventoryReminder() {
   state.reminders.unshift({
     id: crypto.randomUUID(),
     title: 'Inventory prep reminder',
     due: isoToday,
-    owner: state.team[0]?.name || 'Chris',
+    owner: getFallbackOwner().name,
     notes: 'Add what needs checked before inventory on June 25, 2026.',
     done: false
   });
@@ -608,7 +635,7 @@ function addInventoryPrepPlan() {
     title,
     category: 'inventory',
     priority: 'high',
-    owner: state.team[state.tasks.length % state.team.length]?.name || 'Chris',
+    owner: getRotatingOwner().name,
     due: isoToday,
     notes,
     done: false
@@ -639,50 +666,27 @@ async function handlePhotoUpload(event) {
     };
     state.photos.unshift(photo);
 
-    if (category === 'schedule') {
-      state.team = structuredClone(currentLegionTeam);
-      state.messages.unshift({
-        id: crypto.randomUUID(),
-        from: 'Chris',
-        body: 'Schedule photo uploaded: roster was refreshed from the current Legion schedule team.',
-        time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
-        photoId: photo.id
-      });
-    }
-
-    if (category === 'inventory') {
-      inventoryChecklistTemplates.slice(0, 6).forEach(([title, notes], index) => {
-        state.tasks.unshift({
-          id: crypto.randomUUID(),
-          title,
-          category: 'inventory',
-          priority: 'high',
-          owner: state.team[index % state.team.length]?.name || owner,
-          due: getInventoryDueDate(title),
-          notes: `${notes} Created from uploaded inventory guide photo: ${file.name}`,
-          photoId: photo.id,
-          done: false
-        });
-      });
-    }
-
     if (shouldCreateTask) {
       state.tasks.unshift({
         id: crypto.randomUUID(),
-        title: `Photo follow-up: ${capitalize(category)}`,
+        title: category === 'schedule' ? 'Schedule photo follow-up' : `Photo follow-up: ${capitalize(category)}`,
         category: category === 'compass' ? 'compliance' : category,
-        priority: ['compliance', 'planogram', 'truck'].includes(category) ? 'high' : 'medium',
+        priority: ['compliance', 'planogram', 'truck', 'schedule'].includes(category) ? 'high' : 'medium',
         owner,
         due: isoToday,
-        notes: instruction,
+        notes: category === 'schedule'
+          ? `${instruction} Schedule photos are saved as references; roster updates from shifts entered on the Schedule tab.`
+          : instruction,
         photoId: photo.id,
         done: false
       });
 
       state.messages.unshift({
         id: crypto.randomUUID(),
-        from: 'Chris',
-        body: `${owner}: ${instruction}`,
+        from: 'Chris C.',
+        body: category === 'schedule'
+          ? `${owner}: ${instruction} Add or update shifts on the Schedule tab so the roster refreshes.`
+          : `${owner}: ${instruction}`,
         time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
         photoId: photo.id
       });
@@ -692,6 +696,86 @@ async function handlePhotoUpload(event) {
   document.querySelector('#photoForm').reset();
   saveState();
   render();
+}
+
+async function handleSchedulePdfUpload(event) {
+  event.preventDefault();
+  const file = document.querySelector('#schedulePdfInput').files[0];
+  if (!file) return;
+
+  const owner = document.querySelector('#schedulePdfOwner').value || getFallbackOwner().name;
+  const week = Number(document.querySelector('#schedulePdfWeek').value);
+  const notes = document.querySelector('#schedulePdfNotes').value.trim() || 'Review the uploaded published schedule PDF and update shifts on the Schedule tab.';
+  const dataUrl = file.size <= 3500000 ? await readFileAsDataUrl(file) : '';
+  const rawText = await extractLoosePdfText(file);
+
+  const pdf = {
+    id: crypto.randomUUID(),
+    name: file.name,
+    size: file.size,
+    week,
+    owner,
+    notes,
+    createdAt: new Date().toISOString(),
+    dataUrl,
+    extractedText: rawText
+  };
+
+  state.schedulePdfs.unshift(pdf);
+  state.tasks.unshift({
+    id: crypto.randomUUID(),
+    title: `Review schedule PDF: Week ${week + 1}`,
+    category: 'schedule',
+    priority: 'high',
+    owner,
+    due: isoToday,
+    notes: `${notes} Use the PDF reference to verify shifts, then update the Schedule tab so the roster refreshes.`,
+    schedulePdfId: pdf.id,
+    done: false
+  });
+
+  if (!saveState()) {
+    state.schedulePdfs.shift();
+    state.tasks.shift();
+    alert('That PDF is too large to save in this local browser app. Try a smaller PDF, or upload it as a schedule photo/reference instead.');
+    return;
+  }
+
+  document.querySelector('#schedulePdfForm').reset();
+  render();
+  setView('schedule');
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => resolve(reader.result);
+    reader.readAsDataURL(file);
+  });
+}
+
+function readFileAsArrayBuffer(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => resolve(reader.result);
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+async function extractLoosePdfText(file) {
+  try {
+    const buffer = await readFileAsArrayBuffer(file);
+    const text = new TextDecoder('latin1').decode(buffer);
+    const pieces = [...text.matchAll(/\(([^()]{3,120})\)/g)]
+      .map((match) => match[1])
+      .filter((value) => /[A-Za-z]/.test(value))
+      .slice(0, 80);
+    return [...new Set(pieces)].join(' ').replace(/\s+/g, ' ').trim().slice(0, 2000);
+  } catch {
+    return '';
+  }
 }
 
 function resizeImageFile(file) {
@@ -723,12 +807,14 @@ function render() {
   renderInventory();
   renderSuggestions();
   renderSchedule();
+  renderSchedulePdfs();
   renderCompass();
   renderPhotos();
   renderMessages();
   renderRoster();
   renderDailyBrief();
   populatePhotoOwners();
+  populateSchedulePdfOwners();
 }
 
 function renderDailyBrief() {
@@ -920,17 +1006,6 @@ function renderInventory() {
       <strong>${inventoryLabel}</strong>
       <p>${daysLeft} day${daysLeft === 1 ? '' : 's'} left. ${openInventory} inventory prep task${openInventory === 1 ? '' : 's'} still open. ${dueReminders} reminder${dueReminders === 1 ? '' : 's'} due now.</p>
     </article>
-    <article class="inventory-command">
-      <strong>Inventory Command Center</strong>
-      <div class="readiness-grid">
-        ${inventoryReadinessSections.map(([section, checks]) => `
-          <div class="readiness-card">
-            <strong>${section}</strong>
-            <ul>${checks.map((check) => `<li>${check}</li>`).join('')}</ul>
-          </div>
-        `).join('')}
-      </div>
-    </article>
   `;
 
   document.querySelector('#inventoryTaskList').innerHTML = inventoryTasks.length
@@ -1033,6 +1108,45 @@ function renderPhotos() {
   });
 }
 
+function renderSchedulePdfs() {
+  const container = document.querySelector('#schedulePdfList');
+  if (!state.schedulePdfs.length) {
+    container.innerHTML = '<div class="empty-state">Upload the published schedule PDF from email. It will be saved here as the schedule reference for review.</div>';
+    return;
+  }
+
+  container.innerHTML = state.schedulePdfs
+    .map((pdf) => `
+      <article class="schedule-pdf-card">
+        <div class="pdf-title">
+          <div>
+            <strong>${escapeHtml(pdf.name)}</strong>
+            <div class="task-meta">Week ${pdf.week + 1} · ${escapeHtml(pdf.owner)} · ${formatFileSize(pdf.size)}</div>
+          </div>
+          <span class="badge ${pdf.dataUrl ? 'low' : 'medium'}">${pdf.dataUrl ? 'Saved' : 'Too large'}</span>
+        </div>
+        <p class="subtle">${escapeHtml(pdf.notes)}</p>
+        ${
+          pdf.dataUrl
+            ? `<object class="pdf-preview" data="${pdf.dataUrl}" type="application/pdf"><a href="${pdf.dataUrl}" download="${escapeHtml(pdf.name)}">Open PDF</a></object>`
+            : '<div class="empty-state small-empty">This PDF was too large for browser storage. Keep the email copy and use this card as the review task reference.</div>'
+        }
+        ${
+          pdf.extractedText
+            ? `<details class="pdf-text"><summary>Possible extracted text</summary><p>${escapeHtml(pdf.extractedText)}</p></details>`
+            : '<p class="form-hint">No readable text was found in the raw PDF. This usually means the PDF is compressed or image-based.</p>'
+        }
+      </article>
+    `)
+    .join('');
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1048576) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / 1048576).toFixed(1)} MB`;
+}
+
 function getDaysUntilInventory() {
   const target = new Date(`${inventoryDate}T12:00:00`);
   const current = new Date(`${isoToday}T12:00:00`);
@@ -1074,12 +1188,14 @@ function createTaskFromPhoto(photoId) {
   if (!photo) return;
   state.tasks.unshift({
     id: crypto.randomUUID(),
-    title: `Photo follow-up: ${capitalize(photo.category)}`,
+    title: photo.category === 'schedule' ? 'Schedule photo follow-up' : `Photo follow-up: ${capitalize(photo.category)}`,
     category: photo.category === 'compass' ? 'compliance' : photo.category,
-    priority: ['compliance', 'planogram', 'truck'].includes(photo.category) ? 'high' : 'medium',
+    priority: ['compliance', 'planogram', 'truck', 'schedule'].includes(photo.category) ? 'high' : 'medium',
     owner: photo.owner,
     due: isoToday,
-    notes: photo.instruction,
+    notes: photo.category === 'schedule'
+      ? `${photo.instruction} Schedule photos are saved as references; roster updates from shifts entered on the Schedule tab.`
+      : photo.instruction,
     photoId: photo.id,
     done: false
   });
@@ -1093,8 +1209,10 @@ function createMessageFromPhoto(photoId) {
   if (!photo) return;
   state.messages.unshift({
     id: crypto.randomUUID(),
-    from: 'Chris',
-    body: `${photo.owner}: ${photo.instruction}`,
+    from: 'Chris C.',
+    body: photo.category === 'schedule'
+      ? `${photo.owner}: ${photo.instruction} Add or update shifts on the Schedule tab so the roster refreshes.`
+      : `${photo.owner}: ${photo.instruction}`,
     time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
     photoId: photo.id
   });
@@ -1113,6 +1231,10 @@ function photoThumb(photo) {
 }
 
 function renderSchedule() {
+  document.querySelectorAll('[data-schedule-week]').forEach((button) => {
+    button.classList.toggle('active', Number(button.dataset.scheduleWeek) === activeScheduleWeek);
+  });
+
   const weekDates = getScheduleWeekDates(activeScheduleWeek);
   const weekShifts = state.schedule.filter((shift) => weekDates.includes(shift.date));
   const totalHours = weekShifts.reduce((sum, shift) => sum + getShiftHours(shift), 0);
@@ -1297,33 +1419,91 @@ function renderMessages() {
 }
 
 function renderRoster() {
-  const scheduleStats = getScheduleRosterStats();
-  document.querySelector('#rosterList').innerHTML = state.team
-    .map((member) => {
-      const stats = scheduleStats.get(member.name) || { hours: 0, shifts: 0, next: 'No upcoming shift found' };
-      return `
+  const roster = getRosterFromSchedule();
+  document.querySelector('#rosterList').innerHTML = roster.length
+    ? roster
+    .map((member) => `
       <article class="person">
-        <strong>${escapeHtml(member.name)}</strong>
-        <div class="task-meta">${escapeHtml(member.role)} · ${stats.shifts} shift${stats.shifts === 1 ? '' : 's'} · ${stats.hours.toFixed(1)} hrs</div>
-        <div class="subtle">Next: ${escapeHtml(stats.next)}</div>
-        <div class="subtle">Best for ${escapeHtml(member.strength)}.</div>
+        <div class="person-heading">
+          <span class="avatar">${escapeHtml(member.initials)}</span>
+          <div>
+            <strong>${escapeHtml(member.name)}</strong>
+            <div class="task-meta">${escapeHtml(member.role)}</div>
+          </div>
+        </div>
+        <div class="roster-stats">
+          <span>${member.shiftCount} shift${member.shiftCount === 1 ? '' : 's'}</span>
+          <span>${member.hours.toFixed(1)} hrs</span>
+          <span>${member.worksToday ? 'Works today' : 'Next shift'}</span>
+        </div>
+        <div class="subtle">${member.nextShift ? `${formatDateShort(member.nextShift.date)} · ${formatTimeRange(member.nextShift)} · ${member.nextShift.direction}` : 'No upcoming shift scheduled.'}</div>
       </article>
-    `;
-    })
-    .join('');
+    `)
+    .join('')
+    : '<div class="empty-state">No scheduled team members yet. Add shifts on the Schedule tab and the roster will update automatically.</div>';
 }
 
-function getScheduleRosterStats() {
-  const stats = new Map();
+function getRosterFromSchedule() {
+  const teamByName = new Map(state.team.map((member) => [member.name, member]));
+  const upcoming = state.schedule
+    .filter((shift) => shift.date >= isoToday)
+    .sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start));
+  const rosterMap = new Map();
+
   state.schedule.forEach((shift) => {
-    const current = stats.get(shift.name) || { hours: 0, shifts: 0, next: '' };
-    current.hours += shiftMinutes(shift) / 60;
-    current.shifts += 1;
-    const nextLabel = `${formatDue(shift.date)} ${formatTime(shift.start)}-${formatTime(shift.end)}`;
-    if (!current.next || shift.date >= isoToday) current.next = nextLabel;
-    stats.set(shift.name, current);
+    const existing = rosterMap.get(shift.name);
+    const base = teamByName.get(shift.name);
+    const nextShift = upcoming.find((item) => item.name === shift.name) || null;
+    const current = existing || {
+      name: shift.name,
+      role: base?.role || shift.position,
+      initials: getInitials(shift.name),
+      shiftCount: 0,
+      hours: 0,
+      worksToday: false,
+      nextShift
+    };
+
+    current.role = getPrimaryRole(current.role, shift.position);
+    current.shiftCount += 1;
+    current.hours += getShiftHours(shift);
+    current.worksToday = current.worksToday || shift.date === isoToday;
+    current.nextShift = current.nextShift || nextShift;
+    rosterMap.set(shift.name, current);
   });
-  return stats;
+
+  return [...rosterMap.values()].sort((a, b) => {
+    if (a.worksToday !== b.worksToday) return a.worksToday ? -1 : 1;
+    if (a.nextShift && b.nextShift) return a.nextShift.date.localeCompare(b.nextShift.date) || a.name.localeCompare(b.name);
+    if (a.nextShift) return -1;
+    if (b.nextShift) return 1;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+function getFallbackOwner() {
+  return getRosterFromSchedule()[0] || sampleState.team[0] || { name: 'Team Member' };
+}
+
+function getRotatingOwner() {
+  const roster = getRosterFromSchedule();
+  return roster[state.tasks.length % Math.max(roster.length, 1)] || getFallbackOwner();
+}
+
+function getPrimaryRole(currentRole, nextRole) {
+  const managerWords = ['Manager', 'Store Manager', 'Assistant Store Manager', 'ASM'];
+  if (managerWords.some((word) => nextRole.includes(word))) return nextRole;
+  return currentRole || nextRole;
+}
+
+function getInitials(name) {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
 }
 
 function capitalize(value) {

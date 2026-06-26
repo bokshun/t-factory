@@ -8,8 +8,8 @@
     <meta name="apple-mobile-web-app-title" content="StoreFlow" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>DG StoreFlow</title>
-    <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="manifest" href="manifest.webmanifest?v=20260625-2" />
+    <link rel="stylesheet" href="styles.css?v=20260625-2" />
   </head>
   <body>
     <div class="app-shell">
@@ -65,9 +65,9 @@
           <div>
             <p class="eyebrow" id="todayLabel"></p>
             <h2 id="pageTitle">Daily Command Center</h2>
+            <p class="app-version" id="appVersionLabel"></p>
           </div>
           <div class="top-actions">
-            <button class="secondary-button" id="seedButton" type="button">Reload Sample Data</button>
             <button class="primary-button" id="openTaskModal" type="button">New Task</button>
           </div>
         </header>
@@ -126,7 +126,6 @@
             <section class="panel">
               <div class="panel-heading">
                 <h3>Inventory Prep</h3>
-                <button class="text-button" id="addInventoryChecklist" type="button">Load DG checklist</button>
                 <button class="text-button" id="addInventoryPlan" type="button">Add prep plan</button>
               </div>
               <div class="inventory-summary" id="inventorySummary"></div>
@@ -163,6 +162,45 @@
               </div>
               <div class="schedule-stats" id="scheduleStats"></div>
               <div class="schedule-grid" id="scheduleGrid"></div>
+            </section>
+
+            <section class="panel schedule-pdf-panel">
+              <div class="panel-heading">
+                <h3>Schedule PDF Import</h3>
+              </div>
+              <form class="schedule-pdf-form" id="schedulePdfForm">
+                <label>
+                  Published schedule PDF
+                  <input id="schedulePdfInput" type="file" accept="application/pdf,.pdf" required />
+                </label>
+                <div class="two-col">
+                  <label>
+                    Week
+                    <select id="schedulePdfWeek">
+                      <option value="0">Week 1</option>
+                      <option value="1">Week 2</option>
+                    </select>
+                  </label>
+                  <label>
+                    Assign review to
+                    <select id="schedulePdfOwner"></select>
+                  </label>
+                </div>
+                <label>
+                  Review notes
+                  <textarea id="schedulePdfNotes" rows="3" placeholder="Example: Verify everyone from the published schedule is entered into Week 2."></textarea>
+                </label>
+                <button class="primary-button" type="submit">Upload PDF</button>
+                <p class="form-hint">PDF upload stores the published schedule as a reference and creates a review task. Roster changes after shifts are entered or adjusted in the schedule grid.</p>
+              </form>
+            </section>
+
+            <section class="panel schedule-pdf-panel">
+              <div class="panel-heading">
+                <h3>Schedule References</h3>
+                <button class="text-button" id="clearSchedulePdfs" type="button">Clear PDFs</button>
+              </div>
+              <div class="schedule-pdf-list" id="schedulePdfList"></div>
             </section>
 
             <section class="panel">
@@ -215,8 +253,7 @@
                     Category
                     <select id="photoCategory">
                       <option value="compass">Compass / Printout</option>
-                      <option value="schedule">Schedule / Legion Roster</option>
-                      <option value="inventory">Inventory Guide / Prep</option>
+                      <option value="schedule">Schedule</option>
                       <option value="compliance">Compliance</option>
                       <option value="planogram">Planogram / Reset</option>
                       <option value="truck">Truck / Backroom</option>
@@ -233,6 +270,7 @@
                   Direction for team
                   <textarea id="photoInstruction" rows="3" placeholder="Example: Use this Compass photo to set today’s T+4 priorities."></textarea>
                 </label>
+                <p class="form-hint">Schedule photos are saved as references. The roster updates from shifts entered on the Schedule tab.</p>
                 <label class="check-row">
                   <input id="photoCreateTask" type="checkbox" checked />
                   Create a follow-up task and team message
@@ -266,7 +304,6 @@
             <section class="panel">
               <div class="panel-heading">
                 <h3>Team Roster</h3>
-                <button class="text-button" id="importRosterFromSchedule" type="button">Import from schedule</button>
               </div>
               <div class="roster-list" id="rosterList"></div>
             </section>
@@ -295,8 +332,7 @@
               <option value="reset">Reset</option>
               <option value="truck">Truck</option>
               <option value="inventory">Inventory</option>
-              <option value="schedule">Schedule / Legion Roster</option>
-                      <option value="inventory">Inventory Guide / Prep</option>
+              <option value="schedule">Schedule</option>
               <option value="customer">Customer</option>
             </select>
           </label>
@@ -330,6 +366,6 @@
       </form>
     </dialog>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=20260625-2"></script>
   </body>
 </html>
