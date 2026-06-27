@@ -8,8 +8,8 @@
     <meta name="apple-mobile-web-app-title" content="StoreFlow" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>DG StoreFlow</title>
-    <link rel="manifest" href="manifest.webmanifest?v=20260625-2" />
-    <link rel="stylesheet" href="styles.css?v=20260625-2" />
+    <link rel="manifest" href="manifest.webmanifest?v=20260626-4" />
+    <link rel="stylesheet" href="styles.css?v=20260626-4" />
   </head>
   <body>
     <div class="app-shell">
@@ -33,7 +33,7 @@
           </button>
           <button class="nav-item" data-view="inventory" type="button">
             <span class="icon" aria-hidden="true">▤</span>
-            Inventory
+            Events
           </button>
           <button class="nav-item" data-view="schedule" type="button">
             <span class="icon" aria-hidden="true">◷</span>
@@ -90,6 +90,25 @@
           <div class="metric-grid" id="metricGrid"></div>
 
           <div class="content-grid">
+            <section class="panel assistant-panel">
+              <div class="panel-heading">
+                <h3>Daily Assistant Plan</h3>
+                <button class="text-button" id="buildRoutineChecks" type="button">Create routine checks</button>
+              </div>
+              <div class="assistant-plan" id="assistantPlan"></div>
+              <form class="manager-update-form" id="managerUpdateForm">
+                <label>
+                  Manager update
+                  <textarea id="managerUpdateInput" rows="4" placeholder="Example: Truck is late, Sarah called out, compliance still needs safety walk, planogram is behind."></textarea>
+                </label>
+                <div class="form-row actions-row">
+                  <button class="secondary-button" id="previewCourseAction" type="button">Rewrite course</button>
+                  <button class="primary-button" type="submit">Send tasks out</button>
+                </div>
+              </form>
+              <div class="assistant-decision" id="assistantDecision"></div>
+            </section>
+
             <section class="panel">
               <div class="panel-heading">
                 <h3>Priority Tasks</h3>
@@ -115,7 +134,7 @@
             <button class="filter-chip" data-filter="training" type="button">Training</button>
             <button class="filter-chip" data-filter="planogram" type="button">Planograms</button>
             <button class="filter-chip" data-filter="reset" type="button">Resets</button>
-            <button class="filter-chip" data-filter="inventory" type="button">Inventory</button>
+            <button class="filter-chip" data-filter="inventory" type="button">Event Prep</button>
             <button class="filter-chip" data-filter="schedule" type="button">Schedule</button>
           </div>
           <div class="task-board" id="taskBoard"></div>
@@ -125,9 +144,29 @@
           <div class="inventory-layout">
             <section class="panel">
               <div class="panel-heading">
-                <h3>Inventory Prep</h3>
+                <h3 id="eventPlannerTitle">Event Planner</h3>
                 <button class="text-button" id="addInventoryPlan" type="button">Add prep plan</button>
               </div>
+              <form class="event-setup" id="eventSetupForm">
+                <label>
+                  Event name
+                  <input id="eventNameInput" type="text" value="Clearance Event" />
+                </label>
+                <label>
+                  Event date
+                  <input id="eventDateInput" type="date" value="2026-07-15" />
+                </label>
+                <label>
+                  Event type
+                  <select id="eventFocusInput">
+                    <option value="clearance">Clearance</option>
+                    <option value="inventory">Inventory</option>
+                    <option value="seasonal">Seasonal</option>
+                    <option value="reset">Reset</option>
+                  </select>
+                </label>
+                <button class="secondary-button" type="submit">Update event</button>
+              </form>
               <div class="inventory-summary" id="inventorySummary"></div>
               <div class="task-list" id="inventoryTaskList"></div>
             </section>
@@ -366,6 +405,6 @@
       </form>
     </dialog>
 
-    <script src="app.js?v=20260625-2"></script>
+    <script src="app.js?v=20260626-4"></script>
   </body>
 </html>

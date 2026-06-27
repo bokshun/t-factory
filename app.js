@@ -1,11 +1,17 @@
 const storageKey = 'dg-storeflow-state-v1';
-const appVersion = '2026.06.25.2';
+const appVersion = '2026.06.26.4';
 
 const today = new Date();
 const isoToday = today.toISOString().slice(0, 10);
 const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const inventoryDate = '2026-06-25';
 const inventoryLabel = 'June 25, 2026';
+const defaultPlanningEvent = {
+  id: 'clearance-event',
+  name: 'Clearance Event',
+  date: '2026-07-15',
+  focus: 'clearance'
+};
 const scheduleStartDate = '2026-06-13';
 
 const sevenDayWorkflow = [
@@ -190,6 +196,8 @@ const sampleState = {
     { id: 'm2', from: 'Sarah I.', body: 'Safety walk started. I will update once temperature checks are logged.', time: '8:06 AM' }
   ],
   photos: [],
+  assistantDecision: null,
+  planningEvent: defaultPlanningEvent,
   reminders: [
     { id: 'r1', title: 'Inventory countdown check', due: isoToday, owner: 'Chris C.', notes: 'Review open inventory prep tasks and assign each one before shift change.', done: false },
     { id: 'r2', title: 'Backroom readiness check', due: addDays(2), owner: 'Blaire M.', notes: 'Confirm rolltainers, totes, and staged freight are organized for counting.', done: false },
@@ -216,7 +224,7 @@ const views = {
 const pageTitles = {
   dashboard: 'Daily Command Center',
   tasks: 'Task Board',
-  inventory: 'Inventory Prep',
+  inventory: 'Event Planner',
   schedule: 'Schedule and Position Direction',
   compass: 'Compass and 7-Day Workflow',
   photos: 'Photo Intake',
@@ -372,6 +380,8 @@ function normalizeState(savedState) {
     compassNotes: savedState.compassNotes || sampleState.compassNotes,
     messages: savedState.messages || sampleState.messages,
     photos: savedState.photos || [],
+    assistantDecision: savedState.assistantDecision || null,
+    planningEvent: normalizePlanningEvent(savedState.planningEvent),
     reminders: savedState.reminders || sampleState.reminders,
     timeEntries: savedState.timeEntries || [],
     activeTimer: savedState.activeTimer || null
@@ -456,7 +466,7 @@ function clearOldAppCaches() {
     .then((keys) =>
       Promise.all(
         keys
-          .filter((key) => key.startsWith('dg-storeflow-') && key !== 'dg-storeflow-v5')
+          .filter((key) => key.startsWith('dg-storeflow-') && key !== 'dg-storeflow-v9')
           .map((key) => caches.delete(key))
       )
     )
@@ -493,8 +503,13 @@ function bindEvents() {
   document.querySelector('#openTaskModal').addEventListener('click', openTaskDialog);
   document.querySelector('#refreshSuggestions').addEventListener('click', () => {
     renderSuggestions();
+    renderAssistantPlan();
     document.querySelector('#refreshSuggestions').textContent = 'Updated just now';
   });
+
+  document.querySelector('#buildRoutineChecks').addEventListener('click', buildRoutineChecks);
+  document.querySelector('#previewCourseAction').addEventListener('click', previewCourseAction);
+  document.querySelector('#managerUpdateForm').addEventListener('submit', applyCourseAction);
 
   document.querySelector('#taskForm').addEventListener('submit', (event) => {
     const submitter = event.submitter;
@@ -555,6 +570,7 @@ function bindEvents() {
 
   document.querySelector('#addReminder').addEventListener('click', addInventoryReminder);
   document.querySelector('#addInventoryPlan').addEventListener('click', addInventoryPrepPlan);
+  document.querySelector('#eventSetupForm').addEventListener('submit', updatePlanningEvent);
   document.querySelector('#schedulePdfForm').addEventListener('submit', handleSchedulePdfUpload);
   document.querySelector('#clearSchedulePdfs').addEventListener('click', () => {
     state.schedulePdfs = [];
@@ -575,7 +591,7 @@ function setView(viewName) {
 function openTaskDialog() {
   const ownerSelect = document.querySelector('#taskOwner');
   ownerSelect.innerHTML = getRosterFromSchedule()
-    .map((member) => `<option value="${member.name}">${member.name}</option>`)
+    .map((member) => `<option value="${member.name}">${member.name} - ${member.role}</option>`)
     .join('');
   document.querySelector('#taskDue').value = isoToday;
   document.querySelector('#taskModal').showModal();
@@ -583,13 +599,13 @@ function openTaskDialog() {
 
 function populatePhotoOwners() {
   document.querySelector('#photoOwner').innerHTML = getRosterFromSchedule()
-    .map((member) => `<option value="${member.name}">${member.name}</option>`)
+    .map((member) => `<option value="${member.name}">${member.name} - ${member.role}</option>`)
     .join('');
 }
 
 function populateSchedulePdfOwners() {
-  document.querySelector('#schedulePdfOwner').innerHTML = getRosterFromSchedule()
-    .map((member) => `<option value="${member.name}">${member.name}</option>`)
+  document.querySelector('#schedulePdfOwner').innerHTML = getLeadershipRoster()
+    .map((member) => `<option value="${member.name}">${member.name} - ${member.role}</option>`)
     .join('');
 }
 
@@ -611,12 +627,14 @@ function createTask() {
 }
 
 function addInventoryReminder() {
+  const event = getPlanningEvent();
   state.reminders.unshift({
     id: crypto.randomUUID(),
-    title: 'Inventory prep reminder',
+    title: `${event.name} reminder`,
     due: isoToday,
-    owner: getFallbackOwner().name,
-    notes: 'Add what needs checked before inventory on June 25, 2026.',
+    owner: getLeadershipOwner(),
+    notes: `Check open ${event.name.toLowerCase()} prep work before shift change. Target date: ${formatDateLong(event.date)}.`,
+    eventId: event.id,
     done: false
   });
   saveState();
@@ -624,24 +642,72 @@ function addInventoryReminder() {
 }
 
 function addInventoryPrepPlan() {
-  const plans = [
-    ['Inventory prep: verify top stock and sky shelves', 'Check labels, overstock, and shelf location issues before final recovery.'],
-    ['Inventory prep: clean receiving room paths', 'Make count access easy and remove blockers from backroom work areas.'],
-    ['Inventory prep: scan problem outs and shelf label issues', 'Use photos and task notes to point the team to exact aisles.']
-  ];
-  const [title, notes] = plans[state.tasks.filter((task) => task.category === 'inventory').length % plans.length];
+  const event = getPlanningEvent();
+  const plans = getEventPlanTemplates(event);
+  const eventTasks = getEventTasks(event);
+  const [title, notes, ownerType = 'associate'] = plans[eventTasks.length % plans.length];
   state.tasks.unshift({
     id: crypto.randomUUID(),
     title,
     category: 'inventory',
     priority: 'high',
-    owner: getRotatingOwner().name,
+    owner: ownerType === 'leader' ? getLeadershipOwner() : getRotatingOwner().name,
     due: isoToday,
     notes,
+    eventId: event.id,
     done: false
   });
   saveState();
   render();
+}
+
+function updatePlanningEvent(event) {
+  event.preventDefault();
+  const name = document.querySelector('#eventNameInput').value.trim() || defaultPlanningEvent.name;
+  const date = document.querySelector('#eventDateInput').value || defaultPlanningEvent.date;
+  const focus = document.querySelector('#eventFocusInput').value || defaultPlanningEvent.focus;
+  state.planningEvent = {
+    id: `${focus}-${date}`,
+    name,
+    date,
+    focus
+  };
+  saveState();
+  render();
+}
+
+function getEventPlanTemplates(event) {
+  if (event.focus === 'clearance') {
+    return [
+      [`${event.name}: identify clearance sections`, 'Walk the sales floor and list clearance endcaps, tables, seasonal sections, and problem areas.', 'leader'],
+      [`${event.name}: verify labels and markdown signs`, 'Check clearance labels, shelf tags, and sign placement so customers can clearly read the event pricing.', 'associate'],
+      [`${event.name}: stage discontinued and event product`, 'Group product by department, remove damaged items, and stage anything that needs manager review.', 'associate'],
+      [`${event.name}: recover and face event areas`, 'Recover the event set, front-facing product and clearing blocked aisles before peak traffic.', 'associate'],
+      [`${event.name}: final manager walk`, 'Confirm pricing, signing, recovery, customer flow, and any compliance concerns before the event date.', 'leader']
+    ];
+  }
+
+  if (event.focus === 'reset') {
+    return [
+      [`${event.name}: confirm planogram materials`, 'Verify labels, strips, fixtures, discontinued product, and POG notes are ready.', 'leader'],
+      [`${event.name}: stage reset area`, 'Clear the section, group product, and stage tools before reset work starts.', 'associate'],
+      [`${event.name}: final set and recovery`, 'Complete set, recover surrounding aisles, and note blockers for follow-up.', 'associate']
+    ];
+  }
+
+  if (event.focus === 'seasonal') {
+    return [
+      [`${event.name}: fill seasonal feature`, 'Fill event product, face high-traffic areas, and identify outs or signing issues.', 'associate'],
+      [`${event.name}: review seasonal endcaps`, 'Check MAG/endcap execution and make a follow-up list for missing product.', 'leader'],
+      [`${event.name}: customer-ready recovery`, 'Recover seasonal, queue line, and front entrance areas before evening traffic.', 'associate']
+    ];
+  }
+
+  return [
+    [`${event.name}: verify top stock and sky shelves`, 'Check labels, overstock, and shelf location issues before final recovery.', 'associate'],
+    [`${event.name}: clean receiving room paths`, 'Make count access easy and remove blockers from backroom work areas.', 'associate'],
+    [`${event.name}: scan problem outs and shelf label issues`, 'Use photos and task notes to point the team to exact aisles.', 'leader']
+  ];
 }
 
 async function handlePhotoUpload(event) {
@@ -703,7 +769,8 @@ async function handleSchedulePdfUpload(event) {
   const file = document.querySelector('#schedulePdfInput').files[0];
   if (!file) return;
 
-  const owner = document.querySelector('#schedulePdfOwner').value || getFallbackOwner().name;
+  const selectedOwner = document.querySelector('#schedulePdfOwner').value;
+  const owner = isLeadershipRole(getRoleForName(selectedOwner)) ? selectedOwner : getLeadershipOwner();
   const week = Number(document.querySelector('#schedulePdfWeek').value);
   const notes = document.querySelector('#schedulePdfNotes').value.trim() || 'Review the uploaded published schedule PDF and update shifts on the Schedule tab.';
   const dataUrl = file.size <= 3500000 ? await readFileAsDataUrl(file) : '';
@@ -806,6 +873,8 @@ function render() {
   renderTasks();
   renderInventory();
   renderSuggestions();
+  renderAssistantPlan();
+  renderAssistantDecision();
   renderSchedule();
   renderSchedulePdfs();
   renderCompass();
@@ -819,26 +888,28 @@ function render() {
 
 function renderDailyBrief() {
   const todayWorkflow = getWorkflowForToday();
-  const daysLeft = getDaysUntilInventory();
+  const event = getPlanningEvent();
+  const daysLeft = getDaysUntilEvent(event);
   const dueToday = state.tasks.filter((task) => task.due <= isoToday && !task.done);
   const high = dueToday.filter((task) => task.priority === 'high');
   const brief = high.length
-    ? `${high.length} high-priority item${high.length === 1 ? '' : 's'} need attention today. Inventory is ${daysLeft} day${daysLeft === 1 ? '' : 's'} away on ${inventoryLabel}. Today's workflow is ${todayWorkflow.code}: ${todayWorkflow.workflow}`
-    : `Inventory is ${daysLeft} day${daysLeft === 1 ? '' : 's'} away on ${inventoryLabel}. Today's workflow is ${todayWorkflow.code}: ${todayWorkflow.workflow} Keep the team moving through prep, recovery, and customer coverage.`;
+    ? `${high.length} high-priority item${high.length === 1 ? '' : 's'} need attention today. ${event.name} is ${daysLeft} day${daysLeft === 1 ? '' : 's'} away on ${formatDateLong(event.date)}. Today's workflow is ${todayWorkflow.code}: ${todayWorkflow.workflow}`
+    : `${event.name} is ${daysLeft} day${daysLeft === 1 ? '' : 's'} away on ${formatDateLong(event.date)}. Today's workflow is ${todayWorkflow.code}: ${todayWorkflow.workflow} Keep the team moving through prep, recovery, and customer coverage.`;
   document.querySelector('#dailyBrief').textContent = brief;
   document.querySelector('#storeHealthPill').textContent = high.length > 2 ? 'At Risk' : 'On Track';
 }
 
 function renderMetrics() {
+  const event = getPlanningEvent();
   const total = state.tasks.length;
   const done = state.tasks.filter((task) => task.done).length;
   const dueToday = state.tasks.filter((task) => task.due <= isoToday && !task.done).length;
-  const inventoryOpen = state.tasks.filter((task) => task.category === 'inventory' && !task.done).length;
+  const eventOpen = getEventTasks(event).filter((task) => !task.done).length;
 
   const metrics = [
-    ['Inventory In', `${getDaysUntilInventory()} days`],
+    [`${event.name} In`, `${getDaysUntilEvent(event)} days`],
     ['Due Today', dueToday],
-    ['Inventory Open', inventoryOpen],
+    ['Event Open', eventOpen],
     ['Productive Time', formatMinutes(getTotalMinutes())]
   ];
 
@@ -890,12 +961,13 @@ function taskTemplate(task) {
   const photo = findPhoto(task.photoId);
   const minutes = getTaskMinutes(task.id);
   const isActive = state.activeTimer?.taskId === task.id;
+  const ownerRole = getRoleForName(task.owner);
   return `
     <article class="task-card ${task.done ? 'done' : ''}">
       <input type="checkbox" ${task.done ? 'checked' : ''} data-task-toggle="${task.id}" aria-label="Complete ${escapeHtml(task.title)}">
       <div>
         <p class="task-title">${escapeHtml(task.title)}</p>
-        <div class="task-meta">${capitalize(task.category)} · ${escapeHtml(task.owner)} · due ${formatDue(task.due)}</div>
+        <div class="task-meta">${capitalize(task.category)} - ${escapeHtml(task.owner)}${ownerRole ? ` - ${escapeHtml(ownerRole)}` : ''} - due ${formatDue(task.due)}</div>
         <div class="subtle">${escapeHtml(task.notes || 'No notes added.')}</div>
         ${photo ? photoThumb(photo) : ''}
         <div class="task-actions">
@@ -961,11 +1033,12 @@ function addManualTime(taskId, minutes) {
 
 function renderSuggestions() {
   const todayWorkflow = getWorkflowForToday();
+  const event = getPlanningEvent();
   const open = state.tasks.filter((task) => !task.done);
   const highDue = open.filter((task) => task.priority === 'high' && task.due <= isoToday);
   const planograms = open.filter((task) => ['planogram', 'reset'].includes(task.category));
   const training = open.filter((task) => task.category === 'training');
-  const inventory = open.filter((task) => task.category === 'inventory');
+  const eventTasks = getEventTasks(event).filter((task) => !task.done);
 
   const suggestions = [
     highDue.length
@@ -977,8 +1050,8 @@ function renderSuggestions() {
     training.length
       ? `Protect a quiet block for ${training[0].owner} to finish training without register interruptions.`
       : 'Ask each shift lead for one blocker before shift change and turn it into a task.',
-    inventory.length
-      ? `Inventory is ${getDaysUntilInventory()} days away. Put tracked time on "${inventory[0].title}" today.`
+    eventTasks.length
+      ? `${event.name} is ${getDaysUntilEvent(event)} days away. Put tracked time on "${eventTasks[0].title}" today.`
       : 'Use +15 min logs on prep work so you can see where productive time is going.',
     `Today is ${todayWorkflow.day} ${todayWorkflow.code}: ${todayWorkflow.workflow}`
   ];
@@ -988,31 +1061,369 @@ function renderSuggestions() {
     .join('');
 }
 
+function renderAssistantPlan() {
+  const plan = buildDailyAssistantPlan();
+  document.querySelector('#assistantPlan').innerHTML = plan
+    .map(
+      (item) => `
+        <article class="assistant-step">
+          <span class="assistant-time">${escapeHtml(item.time)}</span>
+          <div>
+            <strong>${escapeHtml(item.title)}</strong>
+            <p class="subtle">${escapeHtml(item.detail)}</p>
+          </div>
+        </article>
+      `
+    )
+    .join('');
+}
+
+function previewCourseAction() {
+  const update = document.querySelector('#managerUpdateInput').value.trim();
+  state.assistantDecision = buildCourseAction(update);
+  saveState();
+  renderAssistantDecision();
+}
+
+function applyCourseAction(event) {
+  event.preventDefault();
+  const update = document.querySelector('#managerUpdateInput').value.trim();
+  const decision = buildCourseAction(update);
+  const result = applyAssistantDecision(decision);
+  state.assistantDecision = { ...decision, appliedAt: new Date().toISOString(), result };
+  document.querySelector('#managerUpdateInput').value = '';
+  saveState();
+  render();
+  alert(`${result.tasks} task${result.tasks === 1 ? '' : 's'} created and ${result.messages} team message${result.messages === 1 ? '' : 's'} posted.`);
+}
+
+function renderAssistantDecision() {
+  const container = document.querySelector('#assistantDecision');
+  if (!state.assistantDecision) {
+    container.innerHTML = '<div class="empty-state small-empty">Type a manager update, then rewrite the course of action or send tasks out.</div>';
+    return;
+  }
+
+  const decision = state.assistantDecision;
+  container.innerHTML = `
+    <article class="course-card">
+      <div class="workflow-title">
+        <strong>${escapeHtml(decision.headline)}</strong>
+        <span class="badge ${escapeHtml(decision.risk)}">${capitalize(decision.risk)}</span>
+      </div>
+      <p class="subtle">${escapeHtml(decision.summary)}</p>
+      <div class="course-list">
+        ${decision.actions
+          .map(
+            (action) => `
+              <div class="course-action">
+                <span class="assistant-time">${escapeHtml(action.when)}</span>
+                <div>
+                  <strong>${escapeHtml(action.owner)}: ${escapeHtml(action.title)}</strong>
+                  <p class="subtle">${escapeHtml(action.notes)}</p>
+                </div>
+              </div>
+            `
+          )
+          .join('')}
+      </div>
+      ${
+        decision.result
+          ? `<p class="subtle">Last sent: ${decision.result.tasks} tasks and ${decision.result.messages} messages.</p>`
+          : ''
+      }
+    </article>
+  `;
+}
+
+function buildCourseAction(updateText) {
+  const update = updateText || 'No new update entered. Build the plan from current tasks, schedule, Compass notes, and workflow.';
+  const lower = update.toLowerCase();
+  const todayWorkflow = getWorkflowForToday();
+  const event = getPlanningEvent();
+  const shifts = getTodayShifts();
+  const open = state.tasks.filter((task) => !task.done);
+  const overdue = open.filter((task) => task.due < isoToday);
+  const highDue = open.filter((task) => task.priority === 'high' && task.due <= isoToday);
+  const manager = getLeadershipOwner();
+  const associate = findScheduledOwner(['Sales Associate']) || manager;
+  const closer = [...shifts].reverse().find((shift) => timeToMinutes(shift.end) >= 17 * 60)?.name || associate;
+  const signals = getCourseSignals(lower);
+  const risk = signals.coverage || overdue.length || highDue.length > 2 ? 'high' : signals.compliance || signals.truck ? 'medium' : 'low';
+
+  const actions = [];
+  const addAction = (when, title, category, priority, owner, notes) => {
+    const qualifiedOwner = requiresLeadership(`${category} ${title}`) && !isLeadershipRole(getRoleForName(owner)) ? getLeadershipOwner() : owner;
+    actions.push({ when, title, category, priority, owner: qualifiedOwner, role: getRoleForName(qualifiedOwner), notes });
+  };
+
+  if (signals.coverage) {
+    addAction('Now', 'Reset coverage and protect register/customer flow', 'schedule', 'high', manager, 'Reassign breaks, register coverage, and task owners based on who is actually present.');
+  }
+
+  if (signals.compliance || highDue.some((task) => task.category === 'compliance')) {
+    addAction('First', 'Clear compliance before project work', 'compliance', 'high', manager, 'Complete safety walk, required logs, Compass action items, and anything due today before resets or freight.');
+  }
+
+  if (signals.truck || todayWorkflow.workflow.toLowerCase().includes('truck')) {
+    addAction('Next', 'Stabilize truck and receiving room flow', 'truck', 'high', associate, `${todayWorkflow.workflow}. Stage freight, separate urgent totes, and keep one person accountable for progress updates.`);
+  }
+
+  if (signals.inventory || signals.clearance || getDaysUntilEvent(event) <= 2) {
+    addAction('Today', `Protect ${event.name} readiness`, 'inventory', 'high', manager, getEventReadinessNote(event));
+  }
+
+  if (signals.planogram || open.some((task) => ['planogram', 'reset'].includes(task.category))) {
+    addAction('Block', 'Assign one focused planogram/reset block', 'planogram', 'medium', associate, 'Only start the reset if coverage is stable. Stage labels, discontinued product, and needed fixtures first.');
+  }
+
+  if (signals.training || open.some((task) => task.category === 'training')) {
+    addAction('Window', 'Protect a training window', 'training', 'medium', associate, 'Use the quietest coverage window. Do not pull the trainee back unless customer coverage breaks.');
+  }
+
+  addAction('Close', 'Finish with recovery and progress check', 'reset', 'medium', closer, 'Before shift change, update incomplete tasks, log time, and recover front end plus first 30 feet.');
+
+  return {
+    id: crypto.randomUUID(),
+    createdAt: new Date().toISOString(),
+    input: update,
+    risk,
+    headline: risk === 'high' ? 'Course correction needed' : risk === 'medium' ? 'Adjusted plan' : 'Stay the course',
+    summary: buildCourseSummary(update, todayWorkflow, shifts, highDue, overdue, signals),
+    actions: actions.slice(0, 7)
+  };
+}
+
+function getCourseSignals(lower) {
+  const hasAny = (words) => words.some((word) => lower.includes(word));
+  return {
+    coverage: hasAny(['call out', 'called out', 'short', 'coverage', 'late', 'no show', 'alone', 'break']),
+    compliance: hasAny(['compliance', 'safety', 'temperature', 'temp', 'rotation', 'damages', 'hht', 'price change', 'compass']),
+    truck: hasAny(['truck', 'freight', 'rolltainer', 'tote', 'toppers', 'receiving', 'backstock']),
+    inventory: hasAny(['inventory', 'count', 'nones', 'tons', 'dry damages', 'backroom']),
+    clearance: hasAny(['clearance', 'markdown', 'sale event', 'event table', 'clearance event']),
+    planogram: hasAny(['planogram', 'pog', 'reset', 'sky shelf', 'endcap', 'mag']),
+    training: hasAny(['training', 'cbl', 'learn', 'module']),
+    recovery: hasAny(['recovery', 'recover', 'facing', 'front end', 'first 30'])
+  };
+}
+
+function buildCourseSummary(update, workflow, shifts, highDue, overdue, signals) {
+  const event = getPlanningEvent();
+  const signalText = Object.entries(signals)
+    .filter(([, active]) => active)
+    .map(([name]) => name)
+    .join(', ') || 'current app data';
+  return `Input considered: ${update} Today is ${workflow.day} ${workflow.code}. Scheduled today: ${shifts.length}. High due: ${highDue.length}. Overdue: ${overdue.length}. ${event.name}: ${getDaysUntilEvent(event)} days out. Main signal: ${signalText}.`;
+}
+
+function applyAssistantDecision(decision) {
+  let tasks = 0;
+  let messages = 0;
+
+  decision.actions.forEach((action) => {
+    const title = `Assistant: ${action.title}`;
+    const exists = state.tasks.some((task) => task.title === title && task.owner === action.owner && task.due === isoToday);
+    if (!exists) {
+      state.tasks.unshift({
+        id: crypto.randomUUID(),
+        title,
+        category: action.category,
+        priority: action.priority,
+        owner: action.owner,
+        due: isoToday,
+        notes: `${action.when}: ${action.notes}`,
+        done: false
+      });
+      tasks += 1;
+    }
+
+    state.messages.unshift({
+      id: crypto.randomUUID(),
+      from: 'StoreFlow Assistant',
+      body: `${action.owner}: ${action.title}. ${action.notes}`,
+      time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    });
+    messages += 1;
+  });
+
+  return { tasks, messages };
+}
+
+function buildDailyAssistantPlan() {
+  const todayWorkflow = getWorkflowForToday();
+  const shifts = getTodayShifts();
+  const open = state.tasks.filter((task) => !task.done);
+  const dueNow = open.filter((task) => task.due <= isoToday);
+  const highDue = dueNow.filter((task) => task.priority === 'high');
+  const coverageLead = shifts[0]?.name || getFallbackOwner().name;
+  const complianceOwner = getLeadershipOwner();
+  const floorOwner = findScheduledOwner(['Sales Associate']) || coverageLead;
+  const nextPriority = highDue[0] || dueNow[0] || open[0];
+  const compassSignal = state.compassNotes[0]?.body || 'No Compass note entered yet. Add the key update, then create routine checks.';
+  const pdfSignal = state.schedulePdfs.length
+    ? `${state.schedulePdfs.length} schedule PDF reference${state.schedulePdfs.length === 1 ? '' : 's'} uploaded.`
+    : 'No schedule PDF reference uploaded yet.';
+
+  return [
+    {
+      time: 'Start',
+      title: 'Read Compass, then lock the first priority',
+      detail: nextPriority
+        ? `${complianceOwner} should start with "${nextPriority.title}". Compass signal: ${compassSignal}`
+        : `${complianceOwner} should review Compass and create the first task before the store gets busy.`
+    },
+    {
+      time: 'Coverage',
+      title: 'Use the schedule to assign work',
+      detail: shifts.length
+        ? `${shifts.length} person${shifts.length === 1 ? '' : 's'} scheduled today. First coverage: ${shifts
+            .slice(0, 3)
+            .map((shift) => `${shift.name} ${formatTimeRange(shift)}`)
+            .join(', ')}.`
+        : 'No shifts are entered for today yet. Add the schedule so the app can assign work to people who are actually here.'
+    },
+    {
+      time: 'Workflow',
+      title: `${todayWorkflow.day} ${todayWorkflow.code}`,
+      detail: `${todayWorkflow.workflow}${todayWorkflow.weekly ? ` Weekly duty: ${todayWorkflow.weekly}` : ''}`
+    },
+    {
+      time: 'Routine',
+      title: 'Create daily checks instead of remembering them',
+      detail: `Use Create routine checks to add compliance, recovery, perishable, and workflow tasks for ${floorOwner}. ${pdfSignal}`
+    },
+    {
+      time: 'Close',
+      title: 'Check progress before shift change',
+      detail: `Open items due today: ${dueNow.length}. High priority: ${highDue.length}. Log time on active work so you can see where the day went.`
+    }
+  ];
+}
+
+function buildRoutineChecks() {
+  const todayWorkflow = getWorkflowForToday();
+  const tasksToCreate = [
+    {
+      title: `Compass review and daily direction: ${todayWorkflow.code}`,
+      category: 'compliance',
+      priority: 'high',
+      owner: getLeadershipOwner(),
+      notes: `Review Compass, confirm today's workflow, and post direction for each scheduled person. Workflow: ${todayWorkflow.workflow}`
+    },
+    ...dailyActivities.map((activity) => ({
+      title: `Daily check: ${activity.replace(/\.$/, '')}`,
+      category: activity.toLowerCase().includes('recovery') ? 'reset' : 'compliance',
+      priority: activity.toLowerCase().includes('perishable') || activity.toLowerCase().includes('balance impulse') ? 'high' : 'medium',
+      owner: chooseRoutineOwner(activity),
+      notes: activity
+    }))
+  ];
+
+  if (todayWorkflow.weekly) {
+    tasksToCreate.push({
+      title: `Weekly workflow: ${todayWorkflow.weekly.replace(/\.$/, '')}`,
+      category: 'compliance',
+      priority: 'high',
+      owner: getLeadershipOwner(),
+      notes: todayWorkflow.weekly
+    });
+  }
+
+  if (todayWorkflow.freshTruck) {
+    tasksToCreate.push({
+      title: `Fresh truck routine: ${todayWorkflow.code}`,
+      category: 'truck',
+      priority: 'high',
+      owner: chooseRoutineOwner(todayWorkflow.freshTruck),
+      notes: todayWorkflow.freshTruck
+    });
+  }
+
+  if (todayWorkflow.day === 'Tuesday') {
+    complianceTuesdayTasks.forEach((task) => {
+      tasksToCreate.push({
+        title: `Compliance Tuesday: ${task.replace(/\.$/, '')}`,
+        category: 'compliance',
+        priority: 'high',
+        owner: getLeadershipOwner(),
+        notes: task
+      });
+    });
+  }
+
+  let added = 0;
+  tasksToCreate.forEach((task) => {
+    const exists = state.tasks.some((existing) => existing.title === task.title && existing.due === isoToday);
+    if (exists) return;
+    state.tasks.unshift({
+      id: crypto.randomUUID(),
+      ...task,
+      due: isoToday,
+      done: false
+    });
+    added += 1;
+  });
+
+  saveState();
+  render();
+  alert(added ? `${added} routine check${added === 1 ? '' : 's'} added for today.` : "Routine checks are already on today's task board.");
+}
+
+function getTodayShifts() {
+  return state.schedule
+    .filter((shift) => shift.date === isoToday)
+    .sort((a, b) => a.start.localeCompare(b.start));
+}
+
+function findScheduledOwner(roleKeywords) {
+  const shifts = getTodayShifts();
+  const match = shifts.find((shift) => roleKeywords.some((keyword) => shift.position.toLowerCase().includes(keyword.toLowerCase())));
+  return match?.name || '';
+}
+
+function chooseRoutineOwner(text) {
+  const lower = text.toLowerCase();
+  if (lower.includes('register') || lower.includes('front') || lower.includes('balance impulse')) {
+    return findScheduledOwner(['Sales Associate']) || getFallbackOwner().name;
+  }
+  if (lower.includes('recovery') || lower.includes('stock') || lower.includes('receiving')) {
+    return findScheduledOwner(['Sales Associate']) || findScheduledOwner(['Assistant Store Manager']) || getFallbackOwner().name;
+  }
+  return getLeadershipOwner();
+}
+
 function getWorkflowForToday() {
   return sevenDayWorkflow.find((item) => item.day === dayNames[today.getDay()]) || sevenDayWorkflow[0];
 }
 
 function renderInventory() {
-  const daysLeft = getDaysUntilInventory();
-  const inventoryTasks = state.tasks
-    .filter((task) => task.category === 'inventory')
+  const event = getPlanningEvent();
+  const daysLeft = getDaysUntilEvent(event);
+  document.querySelector('#eventPlannerTitle').textContent = `${event.name} Planner`;
+  document.querySelector('#eventNameInput').value = event.name;
+  document.querySelector('#eventDateInput').value = event.date;
+  document.querySelector('#eventFocusInput').value = event.focus;
+
+  const eventTasks = getEventTasks(event)
     .sort((a, b) => Number(a.done) - Number(b.done) || a.due.localeCompare(b.due));
-  const openInventory = inventoryTasks.filter((task) => !task.done).length;
-  const dueReminders = state.reminders.filter((reminder) => reminder.due <= isoToday && !reminder.done).length;
+  const openEventTasks = eventTasks.filter((task) => !task.done).length;
+  const dueReminders = state.reminders.filter((reminder) => isCurrentEventItem(reminder, event) && reminder.due <= isoToday && !reminder.done).length;
 
   document.querySelector('#inventorySummary').innerHTML = `
     <article class="inventory-countdown">
-      <span class="store-label">Inventory date</span>
-      <strong>${inventoryLabel}</strong>
-      <p>${daysLeft} day${daysLeft === 1 ? '' : 's'} left. ${openInventory} inventory prep task${openInventory === 1 ? '' : 's'} still open. ${dueReminders} reminder${dueReminders === 1 ? '' : 's'} due now.</p>
+      <span class="store-label">${escapeHtml(capitalize(event.focus))} date</span>
+      <strong>${escapeHtml(formatDateLong(event.date))}</strong>
+      <p>${daysLeft} day${daysLeft === 1 ? '' : 's'} left. ${openEventTasks} ${escapeHtml(event.name.toLowerCase())} prep task${openEventTasks === 1 ? '' : 's'} still open. ${dueReminders} reminder${dueReminders === 1 ? '' : 's'} due now.</p>
     </article>
   `;
 
-  document.querySelector('#inventoryTaskList').innerHTML = inventoryTasks.length
-    ? inventoryTasks.map(taskTemplate).join('')
-    : '<div class="empty-state">No inventory prep tasks yet. Add a prep plan to start tracking readiness.</div>';
+  document.querySelector('#inventoryTaskList').innerHTML = eventTasks.length
+    ? eventTasks.map(taskTemplate).join('')
+    : `<div class="empty-state">No ${escapeHtml(event.name.toLowerCase())} prep tasks yet. Add a prep plan to start tracking readiness.</div>`;
 
   document.querySelector('#reminderList').innerHTML = state.reminders
+    .filter((reminder) => isCurrentEventItem(reminder, event))
     .sort((a, b) => Number(a.done) - Number(b.done) || a.due.localeCompare(b.due))
     .map((reminder) => `
       <article class="reminder ${reminder.done ? 'done' : ''}">
@@ -1051,7 +1462,7 @@ function renderTimeSummary() {
 
   document.querySelector('#timeSummary').innerHTML = `
     <div class="time-stat"><span>Total logged</span><strong>${formatMinutes(getTotalMinutes())}</strong></div>
-    <div class="time-stat"><span>Inventory prep</span><strong>${formatMinutes(categoryTotals.inventory || 0)}</strong></div>
+    <div class="time-stat"><span>Event prep</span><strong>${formatMinutes(categoryTotals.inventory || 0)}</strong></div>
     <div class="time-stat"><span>Active timer</span><strong>${state.activeTimer ? 'Running' : 'None'}</strong></div>
     <div class="time-breakdown">
       <strong>By category</strong>
@@ -1151,6 +1562,49 @@ function getDaysUntilInventory() {
   const target = new Date(`${inventoryDate}T12:00:00`);
   const current = new Date(`${isoToday}T12:00:00`);
   return Math.max(0, Math.ceil((target - current) / 86400000));
+}
+
+function getPlanningEvent() {
+  return normalizePlanningEvent(state.planningEvent);
+}
+
+function normalizePlanningEvent(event) {
+  return {
+    ...defaultPlanningEvent,
+    ...(event || {}),
+    name: event?.name || defaultPlanningEvent.name,
+    date: event?.date || defaultPlanningEvent.date,
+    focus: event?.focus || defaultPlanningEvent.focus,
+    id: event?.id || `${event?.focus || defaultPlanningEvent.focus}-${event?.date || defaultPlanningEvent.date}`
+  };
+}
+
+function getDaysUntilEvent(event = getPlanningEvent()) {
+  const target = new Date(`${event.date}T12:00:00`);
+  const current = new Date(`${isoToday}T12:00:00`);
+  return Math.max(0, Math.ceil((target - current) / 86400000));
+}
+
+function getEventTasks(event = getPlanningEvent()) {
+  return state.tasks.filter((task) => isCurrentEventItem(task, event));
+}
+
+function isCurrentEventItem(item, event = getPlanningEvent()) {
+  if (item.eventId) return item.eventId === event.id;
+  return event.focus === 'inventory' && item.category === 'inventory';
+}
+
+function getEventReadinessNote(event = getPlanningEvent()) {
+  if (event.focus === 'clearance') {
+    return 'Focus on clearance signs, markdown labels, event tables, seasonal/clearance sections, damaged items, and final manager walk before the event date.';
+  }
+  if (event.focus === 'reset') {
+    return 'Focus on planogram materials, labels, discontinued product, fixture needs, set completion, and final recovery.';
+  }
+  if (event.focus === 'seasonal') {
+    return 'Focus on seasonal fill, event product, MAG/endcap execution, signing, and customer-ready recovery.';
+  }
+  return 'Focus on backroom organization, nones/tons, damages, first 30 feet recovery, and anything that could slow counting.';
 }
 
 function getTaskMinutes(taskId) {
@@ -1351,6 +1805,10 @@ function formatDateShort(value) {
   return new Date(`${value}T12:00:00`).toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
+function formatDateLong(value) {
+  return new Date(`${value}T12:00:00`).toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
 function renderCompass() {
   document.querySelector('#compassNotes').innerHTML = state.compassNotes
     .map((note) => `
@@ -1481,6 +1939,35 @@ function getRosterFromSchedule() {
   });
 }
 
+function getLeadershipRoster() {
+  const leaders = getRosterFromSchedule().filter((member) => isLeadershipRole(member.role));
+  return leaders.length ? leaders : [sampleState.team[0]];
+}
+
+function getLeadershipOwner() {
+  const todayLeader = getTodayShifts()
+    .map((shift) => ({ name: shift.name, role: getPrimaryRole(getRoleForName(shift.name), shift.position) }))
+    .find((member) => isLeadershipRole(member.role));
+  return todayLeader?.name || getLeadershipRoster()[0]?.name || getFallbackOwner().name;
+}
+
+function getRoleForName(name) {
+  if (!name) return '';
+  return getRosterFromSchedule().find((member) => member.name === name)?.role || state.team.find((member) => member.name === name)?.role || '';
+}
+
+function isLeadershipRole(role = '') {
+  const normalized = role.toLowerCase();
+  return ['store manager', 'assistant store manager', 'assistant manager', 'asm', 'key holder', 'keyholder', 'lead sales associate'].some((keyword) =>
+    normalized.includes(keyword)
+  );
+}
+
+function requiresLeadership(taskOrCategory) {
+  const value = String(taskOrCategory || '').toLowerCase();
+  return ['schedule', 'compliance', 'compass', 'safety', 'course correction', 'daily direction'].some((keyword) => value.includes(keyword));
+}
+
 function getFallbackOwner() {
   return getRosterFromSchedule()[0] || sampleState.team[0] || { name: 'Team Member' };
 }
@@ -1491,9 +1978,19 @@ function getRotatingOwner() {
 }
 
 function getPrimaryRole(currentRole, nextRole) {
-  const managerWords = ['Manager', 'Store Manager', 'Assistant Store Manager', 'ASM'];
-  if (managerWords.some((word) => nextRole.includes(word))) return nextRole;
+  const currentLevel = getRoleLevel(currentRole);
+  const nextLevel = getRoleLevel(nextRole);
+  if (nextLevel > currentLevel) return nextRole;
   return currentRole || nextRole;
+}
+
+function getRoleLevel(role = '') {
+  const normalized = role.toLowerCase();
+  if (normalized.includes('store manager')) return 5;
+  if (normalized.includes('assistant store manager') || normalized.includes('assistant manager') || normalized.includes('asm')) return 4;
+  if (normalized.includes('key holder') || normalized.includes('keyholder') || normalized.includes('lead sales associate')) return 3;
+  if (normalized.includes('sales associate') || normalized.includes('associate')) return 1;
+  return 0;
 }
 
 function getInitials(name) {

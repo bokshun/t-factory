@@ -158,6 +158,13 @@ button {
   margin: 0 0 6px;
 }
 
+.app-version {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .top-actions {
   display: flex;
   gap: 10px;
@@ -345,6 +352,86 @@ button {
   padding: 18px;
 }
 
+.assistant-panel {
+  grid-column: 1 / -1;
+}
+
+.assistant-plan {
+  display: grid;
+  gap: 10px;
+}
+
+.assistant-step {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: #fbfcfa;
+}
+
+.assistant-time {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  border-radius: 999px;
+  background: var(--green-soft);
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.assistant-step strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.manager-update-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.actions-row {
+  align-items: stretch;
+}
+
+.actions-row button {
+  flex: 1;
+}
+
+.assistant-decision {
+  margin-top: 14px;
+}
+
+.course-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: #fbfcfa;
+}
+
+.course-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.course-action {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
 .panel-heading {
   display: flex;
   align-items: center;
@@ -520,6 +607,16 @@ button {
   grid-column: 1 / -1;
 }
 
+.schedule-pdf-panel {
+  min-width: 0;
+}
+
+.schedule-pdf-form,
+.schedule-pdf-list {
+  display: grid;
+  gap: 12px;
+}
+
 .segmented {
   display: flex;
   gap: 8px;
@@ -628,6 +725,43 @@ button {
   font-size: 12px;
 }
 
+.schedule-pdf-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: #fbfcfa;
+}
+
+.pdf-title {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.pdf-preview {
+  width: 100%;
+  height: 360px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--white);
+  margin-top: 12px;
+}
+
+.pdf-text {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.pdf-text summary {
+  color: var(--blue);
+  cursor: pointer;
+  font-weight: 900;
+}
+
 .inventory-layout {
   grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
 }
@@ -638,6 +772,18 @@ button {
 
 .inventory-summary {
   margin-bottom: 12px;
+}
+
+.event-setup {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 180px 160px auto;
+  gap: 10px;
+  align-items: end;
+  margin-bottom: 14px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
 }
 
 .inventory-countdown {
@@ -718,6 +864,33 @@ button {
   margin-bottom: 4px;
 }
 
+.person-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.roster-stats {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.roster-stats span {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0 10px;
+  color: var(--ink);
+  background: var(--soft);
+  border: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 900;
+}
+
 .message-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -742,6 +915,13 @@ button {
   width: 20px;
   min-height: 20px;
   accent-color: var(--green);
+}
+
+.form-hint {
+  margin: -4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 .photo-card {
@@ -880,6 +1060,10 @@ menu {
     grid-template-columns: 1fr;
   }
 
+  .event-setup {
+    grid-template-columns: 1fr;
+  }
+
   .wide-panel {
     grid-column: auto;
   }
@@ -954,9 +1138,3 @@ menu {
     gap: 4px;
   }
 }
-
-.inventory-command { margin-top: 1rem; }
-.readiness-grid { display: grid; gap: .75rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-top: .75rem; }
-.readiness-card { border: 1px solid rgba(255,255,255,.12); border-radius: 14px; padding: .8rem; background: rgba(255,255,255,.04); }
-.readiness-card ul { margin: .5rem 0 0; padding-left: 1.1rem; }
-.readiness-card li { margin: .25rem 0; color: var(--muted); font-size: .88rem; }
