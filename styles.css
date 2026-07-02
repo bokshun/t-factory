@@ -462,6 +462,7 @@ button {
 .position-card,
 .note,
 .workflow-day,
+.standard-card,
 .message,
 .person,
 .photo-card,
@@ -508,8 +509,21 @@ button {
   padding-left: 20px;
 }
 
-.workflow-day li + li {
+.workflow-day li + li,
+.standard-card li + li {
   margin-top: 6px;
+}
+
+.standards-list {
+  display: grid;
+  gap: 10px;
+}
+
+.standard-card ul {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--muted);
+  line-height: 1.45;
 }
 
 .task-card {

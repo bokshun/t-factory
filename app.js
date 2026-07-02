@@ -1,5 +1,5 @@
 const storageKey = 'dg-storeflow-state-v1';
-const appVersion = '2026.06.26.4';
+const appVersion = '2026.07.02.1';
 
 const today = new Date();
 const isoToday = today.toISOString().slice(0, 10);
@@ -88,6 +88,124 @@ const dailyActivities = [
   'Recover and clean first 30 feet all day.',
   'Deep recovery and stock FHB.',
   'Daily recovery from 5:00 p.m. to close for full store.'
+];
+
+const companyStandards = [
+  {
+    area: 'Core Stocking',
+    ownerLevel: 'Manager direction, team execution',
+    triggers: ['truck', 'core stocking', 'rolltainer', 'tote', 'topper', 'receiving'],
+    checks: [
+      'T, T+1, and T+2 focus on planning, receiving, stocking, and core merchandise.',
+      'Check StoreNet for truck notifications, carton count, delivery day, and T+1/T+2 readiness.',
+      'Receiving room must be ready before the truck arrives.',
+      'Driver unloads truck; store helps ensure U-boats are available, answers HHT questions, secures back door, and prints delivery receipt.',
+      'Start with toppers to free U-boats, then move on to totes.',
+      'Stock merchandise in the proper location, apply EAS tags and rotation when applicable, and do not make on-hand adjustments during core stocking.',
+      'Core rolltainers, toppers, and totes should be stocked by end of T+2; recovery after 5 p.m. remains critical.'
+    ]
+  },
+  {
+    area: 'Dry Core Scanning',
+    ownerLevel: 'Manager/key holder oversight',
+    triggers: ['dry core', 'scan', 'nones', 'tons', 'ohaust', 'all-in-one'],
+    checks: [
+      'T-Day through T+1: no adjustments; core stocking should be completed by T+2.',
+      'T+2 through T+5: use All-In-One screen for positive and negative adjustments as issues are found.',
+      'Only complete positive adjustments while working sky shelves, front end/candy cart, and backstock totes.',
+      'T+6: complete Nones and Tons for sales floor and receiving room.',
+      'Scan goal is 200 dry core scans: positive, negative, and no adjustment.',
+      'Nones screen focus is department outs on the sales floor, prioritizing planograms that reset the prior week.',
+      'Tons screen focus is full case packs for focus departments and restocking cases the HHT identifies as opportunity.'
+    ]
+  },
+  {
+    area: 'MAG, POG, Endcaps, and Sky Shelves',
+    ownerLevel: 'Manager direction, assigned project owner execution',
+    triggers: ['mag', 'pog', 'planogram', 'endcap', 'g-section', 'sky shelf', 'sky shelves'],
+    checks: [
+      'Monthly Activity Guide gives detailed store layouts and displays by week.',
+      'MAG and POG abbreviations appear on carton labels.',
+      'Use the MAG book to set and fill four-foot G-sections, complete planned MAG endcaps, label and sticker G-sections, and set aside MAG product from T+1 through T+2.',
+      'Planograms should be completed by end of T+4.',
+      'Sky shelves should be completed by end of T+4.',
+      'Make positive all-in-one adjustments on the HHT for overstock items placed on sky shelves.',
+      'Avoid storing heavy items like pet food on sky shelves; use U-boats in the receiving room and try to store sky shelf backstock directly above its home location or within 12 feet.'
+    ]
+  },
+  {
+    area: 'T+5 and T+6 Next Truck Prep',
+    ownerLevel: 'Manager/key holder oversight',
+    triggers: ['t+5', 't+6', 'next truck', 'backstock', 'receiving room', 'damages'],
+    checks: [
+      'T+5 focus is reworking backstock, filling outs, and reducing receiving room inventory for the next delivery.',
+      'Work both backstock U-boats and totes to keep things organized.',
+      'T+6 includes backstock, nones and tons, and preparing the receiving room.',
+      'Organize receiving room into delivery, backstock, and warehouse/storage zones.',
+      'Label backstock U-boats and totes with department, employee name, date last worked, and other needed details.',
+      'Complete damages in the HHT, follow camera/SOP guidance when needed, and put damaged items into the damage control center.'
+    ]
+  },
+  {
+    area: 'Stocking Methods Observation',
+    ownerLevel: 'Store manager only',
+    triggers: ['stocking observation', 'coaching', 'stocking method', 'pace'],
+    checks: [
+      'Observe stocking preparation: rolltainer retrieval, placement by visual inspection, cardboard/overstock U-boat placement, and proper tools.',
+      'Observe stocking activity: DC label use, safe lifting, MAG/backstock handling, no ducking backstock, steady pace, efficient box opening, two-hand stocking, facing/blocking, cardboard breakdown, and selecting boxes before reaching the rolltainer.',
+      'Observe backroom organization: cardboard and empty rolltainers in delivery zone, backstock organized to U-boats, and MAG organized to proper U-boat or MAG area.',
+      'Capture store manager notes, employee comments, actions, and manager recommendations.'
+    ]
+  },
+  {
+    area: 'Plastic Film and Cardboard Rolltainer Compliance',
+    ownerLevel: 'All team, manager verification',
+    triggers: ['plastic', 'recycling', 'cardboard', 'rolltainer compliance', 'liner'],
+    checks: [
+      'Tie black or white trash bag to left side of cardboard rolltainer and clear recycling liner to right side.',
+      'Clear plastic film from case packs goes only in the clear recycling liner.',
+      'Other waste goes in the black or white trash bag or dumpster.',
+      'Do not leave trash bags tied outside rolltainers and do not return trash to DCs.',
+      'A full cardboard rolltainer should include a full clear recycling liner containing only plastic film, tied closed, on top of the cardboard.',
+      'Load rolltainers fully, break down all cardboard boxes, and store cardboard rolltainers inside until the DC truck arrives.',
+      'Do not add plastic, trash, or styrofoam to the cardboard rolltainer; store rolltainers outside overhang only as needed.'
+    ]
+  },
+  {
+    area: 'Respond Tickets',
+    ownerLevel: 'Store manager / leadership only',
+    triggers: ['respond', 'ticket', 'sku increase', 'stock level', 'excessive sku', 'special order'],
+    checks: [
+      'Use Respond for DG replenished stock level issues and requests after the 7-day workflow has been followed.',
+      'Common needs include SKU increase, excessive SKUs, SKUs not listed in current MAG/POG, special customer orders, not receiving stock after PIA is complete, and significant sales changes.',
+      'Tickets need clear current issue/request notes, specific issue selections, example SKUs/UPCs, and POG ID when applicable.',
+      'Check submitted tickets daily and do not submit vague tickets without clear store details.',
+      'Missing required details may place tickets in pending status until more information is provided.'
+    ]
+  },
+  {
+    area: 'Department Last Worked and MM Labels',
+    ownerLevel: 'Team execution, manager review',
+    triggers: ['department sheet', 'last worked', 'mm', 'mixed merchandise', 'u-boat', 'overstock'],
+    checks: [
+      'Use a universal department worked sheet instead of separate paper for every department when possible.',
+      'Track department, category/aisle, core or non-core, date last worked, name, remaining work, and manager follow-up.',
+      'Support department presets such as Beauty Care/Cosmetics, Home Decor/Candles and Potpourri, Sundries/Batteries, and Seasonal blank.',
+      'Support printable labels/sheets for MM boxes, overstock rolltainers, U-boats, and tote process follow-up.',
+      'Team members should be able to print a sheet, retrieve it from the office printer, and label the MM box or work vehicle.'
+    ]
+  },
+  {
+    area: 'Store Manager Override',
+    ownerLevel: 'Store manager only',
+    triggers: ['override', 'manual time', 'forgot timer', 'blocked', 'move on'],
+    checks: [
+      'Standards should guide the work, but manager judgment keeps the day moving.',
+      'Allow manager override when task was completed but not marked, a worker forgot to start/stop timer, customer coverage took priority, task is blocked, or manager verified manually.',
+      'Override should require a reason and keep follow-up visible when work is still incomplete.',
+      'Manual time adjustment should be manager-only and require team member, task, time/minutes, and reason.'
+    ]
+  }
 ];
 
 const sampleState = {
@@ -466,7 +584,7 @@ function clearOldAppCaches() {
     .then((keys) =>
       Promise.all(
         keys
-          .filter((key) => key.startsWith('dg-storeflow-') && key !== 'dg-storeflow-v9')
+          .filter((key) => key.startsWith('dg-storeflow-') && key !== 'dg-storeflow-v10')
           .map((key) => caches.delete(key))
       )
     )
@@ -1181,6 +1299,11 @@ function buildCourseAction(updateText) {
     addAction('Window', 'Protect a training window', 'training', 'medium', associate, 'Use the quietest coverage window. Do not pull the trainee back unless customer coverage breaks.');
   }
 
+  getTriggeredStandards(lower).slice(0, 3).forEach((standard) => {
+    const owner = requiresLeadership(standard.area) || standard.ownerLevel.toLowerCase().includes('manager') ? manager : associate;
+    addAction('Standard', `Verify ${standard.area}`, getStandardCategory(standard), 'medium', owner, standard.checks[0]);
+  });
+
   addAction('Close', 'Finish with recovery and progress check', 'reset', 'medium', closer, 'Before shift change, update incomplete tasks, log time, and recover front end plus first 30 feet.');
 
   return {
@@ -1204,8 +1327,23 @@ function getCourseSignals(lower) {
     clearance: hasAny(['clearance', 'markdown', 'sale event', 'event table', 'clearance event']),
     planogram: hasAny(['planogram', 'pog', 'reset', 'sky shelf', 'endcap', 'mag']),
     training: hasAny(['training', 'cbl', 'learn', 'module']),
-    recovery: hasAny(['recovery', 'recover', 'facing', 'front end', 'first 30'])
+    recovery: hasAny(['recovery', 'recover', 'facing', 'front end', 'first 30']),
+    standards: getTriggeredStandards(lower).length > 0
   };
+}
+
+function getTriggeredStandards(lower) {
+  if (!lower) return [];
+  return companyStandards.filter((standard) => standard.triggers.some((trigger) => lower.includes(trigger)));
+}
+
+function getStandardCategory(standard) {
+  const area = standard.area.toLowerCase();
+  if (area.includes('respond') || area.includes('compliance') || area.includes('observation') || area.includes('override')) return 'compliance';
+  if (area.includes('mag') || area.includes('pog')) return 'planogram';
+  if (area.includes('truck') || area.includes('stocking') || area.includes('scanning')) return 'truck';
+  if (area.includes('department') || area.includes('mm')) return 'inventory';
+  return 'compliance';
 }
 
 function buildCourseSummary(update, workflow, shifts, highDue, overdue, signals) {
@@ -1848,6 +1986,20 @@ function renderCompass() {
         <ul>${dailyActivities.map((task) => `<li>${escapeHtml(task)}</li>`).join('')}</ul>
       </article>
     `;
+
+  document.querySelector('#standardsList').innerHTML = companyStandards
+    .map(
+      (standard) => `
+        <article class="standard-card">
+          <div class="workflow-title">
+            <strong>${escapeHtml(standard.area)}</strong>
+            <span class="badge medium">${escapeHtml(standard.ownerLevel)}</span>
+          </div>
+          <ul>${standard.checks.map((check) => `<li>${escapeHtml(check)}</li>`).join('')}</ul>
+        </article>
+      `
+    )
+    .join('');
 }
 
 function workflowLine(label, value) {
