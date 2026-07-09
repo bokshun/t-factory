@@ -432,6 +432,19 @@ button {
   border-top: 1px solid var(--line);
 }
 
+.sync-form {
+  display: grid;
+  gap: 12px;
+}
+
+.sync-form .actions-row {
+  flex-wrap: wrap;
+}
+
+.sync-form .text-button {
+  min-height: 42px;
+}
+
 .panel-heading {
   display: flex;
   align-items: center;
@@ -782,6 +795,19 @@ button {
 
 .wide-panel {
   grid-column: 1 / -1;
+}
+
+.is-hidden {
+  display: none !important;
+}
+
+.access-panel {
+  border-color: rgba(47, 123, 91, 0.28);
+}
+
+.access-form {
+  display: grid;
+  gap: 14px;
 }
 
 .inventory-summary {

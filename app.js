@@ -1,6 +1,7 @@
 const storageKey = 'dg-storeflow-state-v1';
 const syncConfigKey = 'dg-storeflow-sync-config-v1';
-const appVersion = '2026.07.02.2';
+const accessProfileKey = 'dg-storeflow-access-profile-v1';
+const appVersion = '2026.07.02.3';
 
 let syncSaveTimer = null;
 let syncChannel = null;
@@ -333,6 +334,7 @@ const sampleState = {
 let state = loadState();
 let activeFilter = 'all';
 let activeScheduleWeek = getCurrentScheduleWeek();
+let currentAccess = loadAccessProfile();
 
 const views = {
   dashboard: document.querySelector('#dashboardView'),
@@ -577,6 +579,164 @@ function saveState() {
   }
 }
 
+function loadAccessProfile() {
+  const params = new URLSearchParams(window.location.search);
+  const urlRole = normalizeAccessRole(params.get('access'));
+  const urlMember = params.get('member')?.trim() || '';
+
+  if (urlRole) {
+    const profile = {
+      role: urlRole,
+      member: urlMember || (urlRole === 'manager' ? 'Chris C.' : '')
+    };
+    localStorage.setItem(accessProfileKey, JSON.stringify(profile));
+    return profile;
+  }
+
+  try {
+    const saved = JSON.parse(localStorage.getItem(accessProfileKey));
+    return normalizeAccessProfile(saved);
+  } catch {
+    return { role: 'manager', member: 'Chris C.' };
+  }
+}
+
+function normalizeAccessProfile(profile = {}) {
+  return {
+    role: normalizeAccessRole(profile.role) || 'manager',
+    member: profile.member || 'Chris C.'
+  };
+}
+
+function normalizeAccessRole(role) {
+  return ['manager', 'keyholder', 'associate'].includes(role) ? role : '';
+}
+
+function saveAccessProfile(event) {
+  event.preventDefault();
+  currentAccess = {
+    role: document.querySelector('#accessRole').value,
+    member: document.querySelector('#accessMember').value
+  };
+  localStorage.setItem(accessProfileKey, JSON.stringify(currentAccess));
+  applyAccessControls();
+  renderTasks();
+  renderMessages();
+  renderRoster();
+}
+
+function isManagerAccess() {
+  return currentAccess.role === 'manager';
+}
+
+function isKeyholderAccess() {
+  return currentAccess.role === 'keyholder';
+}
+
+function isAssociateAccess() {
+  return currentAccess.role === 'associate';
+}
+
+function getAllowedViews() {
+  if (isManagerAccess()) return ['dashboard', 'tasks', 'inventory', 'schedule', 'compass', 'photos', 'team'];
+  if (isKeyholderAccess()) return ['dashboard', 'tasks', 'schedule', 'compass', 'team'];
+  return ['tasks', 'team'];
+}
+
+function canUseManagerTools() {
+  return isManagerAccess();
+}
+
+function canWorkTask(task) {
+  if (!isAssociateAccess()) return true;
+  return !currentAccess.member || task.owner === currentAccess.member;
+}
+
+function getVisibleTasks(tasks = state.tasks) {
+  return tasks.filter(canWorkTask);
+}
+
+function getAccessLabel() {
+  if (isManagerAccess()) return `Manager mode${currentAccess.member ? ` - ${currentAccess.member}` : ''}`;
+  if (isKeyholderAccess()) return `Keyholder mode${currentAccess.member ? ` - ${currentAccess.member}` : ''}`;
+  return `Associate mode${currentAccess.member ? ` - ${currentAccess.member}` : ''}`;
+}
+
+function applyAccessControls() {
+  const allowedViews = getAllowedViews();
+  document.querySelectorAll('.nav-item').forEach((button) => {
+    const allowed = allowedViews.includes(button.dataset.view);
+    button.classList.toggle('is-hidden', !allowed);
+    button.disabled = !allowed;
+  });
+
+  const currentViewName = Object.entries(views).find(([, view]) => view.classList.contains('active'))?.[0] || 'dashboard';
+  if (!allowedViews.includes(currentViewName)) setView(allowedViews[0]);
+
+  const managerSelectors = [
+    '#openTaskModal',
+    '#buildRoutineChecks',
+    '#previewCourseAction',
+    '#managerUpdateForm',
+    '#addInventoryPlan',
+    '#eventSetupForm',
+    '#addReminder',
+    '#schedulePdfForm',
+    '#clearSchedulePdfs',
+    '#addShift',
+    '#addCompassNote',
+    '#photoForm',
+    '#clearPhotos',
+    '#syncForm'
+  ];
+
+  managerSelectors.forEach((selector) => {
+    const element = document.querySelector(selector);
+    if (element) element.classList.toggle('is-hidden', !canUseManagerTools());
+  });
+
+  document.querySelectorAll('.schedule-pdf-panel').forEach((panel) => {
+    panel.classList.toggle('is-hidden', !canUseManagerTools());
+  });
+
+  const accessForm = document.querySelector('#accessForm');
+  if (accessForm) accessForm.classList.toggle('is-hidden', !canUseManagerTools());
+
+  const status = document.querySelector('#accessStatus');
+  if (status) status.textContent = getAccessLabel();
+
+  const hint = document.querySelector('#accessHint');
+  if (hint) {
+    hint.textContent = canUseManagerTools()
+      ? 'Manager mode is for you, Sarah, and Margaret. Associates should use an associate link so they only see assigned work and team messages.'
+      : 'This phone is limited to the work this role should see. Ask a manager for changes to schedule, uploads, sync, or store setup.';
+  }
+
+  populateAccessMembers();
+}
+
+function populateAccessMembers() {
+  const select = document.querySelector('#accessMember');
+  if (!select) return;
+  const roster = getRosterFromSchedule();
+  const names = [...new Set([currentAccess.member, 'Chris C.', ...roster.map((member) => member.name)].filter(Boolean))];
+  select.innerHTML = names.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
+  select.value = names.includes(currentAccess.member) ? currentAccess.member : names[0] || '';
+  const roleSelect = document.querySelector('#accessRole');
+  if (roleSelect) roleSelect.value = currentAccess.role;
+}
+
+function copyAccessLink(role) {
+  const member = document.querySelector('#accessMember').value || currentAccess.member || '';
+  const url = new URL(window.location.href);
+  url.searchParams.set('access', role);
+  if (member) url.searchParams.set('member', member);
+  navigator.clipboard
+    ?.writeText(url.toString())
+    .then(() => alert(`${capitalize(role)} link copied for ${member || 'team member'}.`))
+    .catch(() => alert(`Copy this link: ${url.toString()}`));
+}
+
 function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   window.addEventListener('load', () => {
@@ -792,6 +952,7 @@ function bindEvents() {
     const submitter = event.submitter;
     if (submitter?.value === 'cancel') return;
     event.preventDefault();
+    if (!canUseManagerTools()) return alert('Only manager access can create new tasks.');
     createTask();
   });
 
@@ -802,7 +963,7 @@ function bindEvents() {
     if (!body) return;
     state.messages.unshift({
       id: crypto.randomUUID(),
-      from: 'Chris C.',
+      from: currentAccess.member || 'Team Member',
       body,
       time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
     });
@@ -812,6 +973,7 @@ function bindEvents() {
   });
 
   document.querySelector('#addShift').addEventListener('click', () => {
+    if (!canUseManagerTools()) return alert('Only manager access can edit shifts.');
     const roster = getRosterFromSchedule();
     const next = roster[state.schedule.length % roster.length] || getFallbackOwner();
     const date = addDaysToDate(scheduleStartDate, activeScheduleWeek * 7);
@@ -829,6 +991,7 @@ function bindEvents() {
   });
 
   document.querySelector('#addCompassNote').addEventListener('click', () => {
+    if (!canUseManagerTools()) return alert('Only manager access can add Compass notes.');
     state.compassNotes.unshift({
       id: crypto.randomUUID(),
       title: 'New Compass note',
@@ -840,6 +1003,7 @@ function bindEvents() {
 
   document.querySelector('#photoForm').addEventListener('submit', handlePhotoUpload);
   document.querySelector('#clearPhotos').addEventListener('click', () => {
+    if (!canUseManagerTools()) return alert('Only manager access can clear photos.');
     state.photos = [];
     saveState();
     render();
@@ -850,6 +1014,7 @@ function bindEvents() {
   document.querySelector('#eventSetupForm').addEventListener('submit', updatePlanningEvent);
   document.querySelector('#schedulePdfForm').addEventListener('submit', handleSchedulePdfUpload);
   document.querySelector('#clearSchedulePdfs').addEventListener('click', () => {
+    if (!canUseManagerTools()) return alert('Only manager access can clear schedule PDFs.');
     state.schedulePdfs = [];
     saveState();
     renderSchedulePdfs();
@@ -859,9 +1024,14 @@ function bindEvents() {
   document.querySelector('#syncPull').addEventListener('click', () => pullCloudState(true));
   document.querySelector('#syncPush').addEventListener('click', () => pushCloudState(true));
   document.querySelector('#syncDisable').addEventListener('click', disableCloudSync);
+  document.querySelector('#accessForm').addEventListener('submit', saveAccessProfile);
+  document.querySelector('#copyAssociateLink').addEventListener('click', () => copyAccessLink('associate'));
+  document.querySelector('#copyKeyholderLink').addEventListener('click', () => copyAccessLink('keyholder'));
 }
 
 function setView(viewName) {
+  const allowedViews = getAllowedViews();
+  if (!allowedViews.includes(viewName)) viewName = allowedViews[0];
   Object.values(views).forEach((view) => view.classList.remove('active'));
   views[viewName].classList.add('active');
   document.querySelectorAll('.nav-item').forEach((button) => {
@@ -909,6 +1079,7 @@ function createTask() {
 }
 
 function addInventoryReminder() {
+  if (!canUseManagerTools()) return alert('Only manager access can add reminders.');
   const event = getPlanningEvent();
   state.reminders.unshift({
     id: crypto.randomUUID(),
@@ -924,6 +1095,7 @@ function addInventoryReminder() {
 }
 
 function addInventoryPrepPlan() {
+  if (!canUseManagerTools()) return alert('Only manager access can add prep plans.');
   const event = getPlanningEvent();
   const plans = getEventPlanTemplates(event);
   const eventTasks = getEventTasks(event);
@@ -945,6 +1117,7 @@ function addInventoryPrepPlan() {
 
 function updatePlanningEvent(event) {
   event.preventDefault();
+  if (!canUseManagerTools()) return alert('Only manager access can update events.');
   const name = document.querySelector('#eventNameInput').value.trim() || defaultPlanningEvent.name;
   const date = document.querySelector('#eventDateInput').value || defaultPlanningEvent.date;
   const focus = document.querySelector('#eventFocusInput').value || defaultPlanningEvent.focus;
@@ -994,6 +1167,7 @@ function getEventPlanTemplates(event) {
 
 async function handlePhotoUpload(event) {
   event.preventDefault();
+  if (!canUseManagerTools()) return alert('Only manager access can upload photos.');
   const files = [...document.querySelector('#photoInput').files];
   if (!files.length) return;
 
@@ -1048,6 +1222,7 @@ async function handlePhotoUpload(event) {
 
 async function handleSchedulePdfUpload(event) {
   event.preventDefault();
+  if (!canUseManagerTools()) return alert('Only manager access can upload schedule PDFs.');
   const file = document.querySelector('#schedulePdfInput').files[0];
   if (!file) return;
 
@@ -1151,6 +1326,7 @@ function resizeImageFile(file) {
 }
 
 function render() {
+  applyAccessControls();
   renderMetrics();
   renderTasks();
   renderInventory();
@@ -1201,13 +1377,16 @@ function renderMetrics() {
 }
 
 function renderTasks() {
-  const sorted = [...state.tasks].sort((a, b) => {
+  const visibleTasks = getVisibleTasks();
+  const sorted = [...visibleTasks].sort((a, b) => {
     const priorityScore = { high: 0, medium: 1, low: 2 };
     return priorityScore[a.priority] - priorityScore[b.priority] || a.due.localeCompare(b.due);
   });
 
   const filtered = activeFilter === 'all' ? sorted : sorted.filter((task) => task.category === activeFilter);
-  document.querySelector('#taskBoard').innerHTML = filtered.map(taskTemplate).join('');
+  document.querySelector('#taskBoard').innerHTML = filtered.length
+    ? filtered.map(taskTemplate).join('')
+    : `<div class="empty-state">${isAssociateAccess() ? 'No tasks assigned to this team member yet.' : 'No tasks match this filter.'}</div>`;
   document.querySelector('#priorityTaskList').innerHTML = sorted.filter((task) => !task.done).slice(0, 4).map(taskTemplate).join('');
   bindTaskControls(document.querySelector('#tasksView'));
   bindTaskControls(document.querySelector('#dashboardView'));
@@ -1361,6 +1540,7 @@ function renderAssistantPlan() {
 }
 
 function previewCourseAction() {
+  if (!canUseManagerTools()) return alert('Only manager access can rewrite the course of action.');
   const update = document.querySelector('#managerUpdateInput').value.trim();
   state.assistantDecision = buildCourseAction(update);
   saveState();
@@ -1369,6 +1549,7 @@ function previewCourseAction() {
 
 function applyCourseAction(event) {
   event.preventDefault();
+  if (!canUseManagerTools()) return alert('Only manager access can send manager course actions.');
   const update = document.querySelector('#managerUpdateInput').value.trim();
   const decision = buildCourseAction(update);
   const result = applyAssistantDecision(decision);
@@ -1604,6 +1785,7 @@ function buildDailyAssistantPlan() {
 }
 
 function buildRoutineChecks() {
+  if (!canUseManagerTools()) return alert('Only manager access can create routine checks.');
   const todayWorkflow = getWorkflowForToday();
   const tasksToCreate = [
     {
