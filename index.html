@@ -8,8 +8,8 @@
     <meta name="apple-mobile-web-app-title" content="StoreFlow" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>DG StoreFlow</title>
-    <link rel="manifest" href="manifest.webmanifest?v=20260702-2" />
-    <link rel="stylesheet" href="styles.css?v=20260702-2" />
+    <link rel="manifest" href="manifest.webmanifest?v=20260702-3" />
+    <link rel="stylesheet" href="styles.css?v=20260702-3" />
   </head>
   <body>
     <div class="app-shell">
@@ -336,6 +336,34 @@
 
         <section class="view" id="teamView">
           <div class="team-layout">
+            <section class="panel wide-panel access-panel">
+              <div class="panel-heading">
+                <h3>Device Access</h3>
+                <span class="status-pill" id="accessStatus">Manager</span>
+              </div>
+              <form class="access-form" id="accessForm">
+                <div class="two-col">
+                  <label>
+                    Role for this phone
+                    <select id="accessRole">
+                      <option value="manager">Manager / Assistant Manager</option>
+                      <option value="keyholder">Key holder</option>
+                      <option value="associate">Sales associate</option>
+                    </select>
+                  </label>
+                  <label>
+                    Team member
+                    <select id="accessMember"></select>
+                  </label>
+                </div>
+                <div class="form-row actions-row">
+                  <button class="primary-button" type="submit">Save device access</button>
+                  <button class="secondary-button" id="copyAssociateLink" type="button">Copy associate link</button>
+                  <button class="secondary-button" id="copyKeyholderLink" type="button">Copy keyholder link</button>
+                </div>
+              </form>
+              <p class="form-hint" id="accessHint">Manager mode is for you, Sarah, and Margaret. Associates should use an associate link so they only see their assigned work and team messages.</p>
+            </section>
             <section class="panel">
               <div class="panel-heading">
                 <h3>Team Messages</h3>
@@ -439,6 +467,6 @@
     </dialog>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=20260702-2"></script>
+    <script src="app.js?v=20260702-3"></script>
   </body>
 </html>
