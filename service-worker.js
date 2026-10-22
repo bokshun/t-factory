@@ -1,9 +1,10 @@
-const cacheName = 'dg-storeflow-v12';
-const assetVersion = '20260702-3';
+const cacheName = 'dg-storeflow-v13';
+const assetVersion = '20261021-1';
 const appShell = [
   './',
   './index.html',
   `./styles.css?v=${assetVersion}`,
+  `./sync-core.js?v=${assetVersion}`,
   `./app.js?v=${assetVersion}`,
   `./manifest.webmanifest?v=${assetVersion}`,
   './icon.svg'

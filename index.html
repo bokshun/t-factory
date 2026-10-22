@@ -388,7 +388,7 @@
               <form class="sync-form" id="syncForm">
                 <label>
                   Store sync ID
-                  <input id="syncStoreId" type="text" placeholder="example: store-19891" autocomplete="off" />
+                  <input id="syncStoreId" type="text" placeholder="testing: 19891-test" autocomplete="off" />
                 </label>
                 <label>
                   Supabase URL
@@ -398,6 +398,19 @@
                   Supabase anon key
                   <input id="syncKey" type="password" placeholder="Paste anon public key" autocomplete="off" />
                 </label>
+                <label>
+                  Team email
+                  <input id="syncEmail" type="email" placeholder="your approved email" autocomplete="username" />
+                </label>
+                <label>
+                  Password
+                  <input id="syncPassword" type="password" placeholder="your StoreFlow password" autocomplete="current-password" />
+                </label>
+                <div class="form-row actions-row">
+                  <button class="primary-button" id="syncSignIn" type="button">Sign in</button>
+                  <button class="text-button" id="syncSignOut" type="button">Sign out</button>
+                  <button class="secondary-button is-hidden" id="syncInit" type="button">Start cloud board</button>
+                </div>
                 <div class="form-row actions-row">
                   <button class="secondary-button" id="syncPull" type="button">Pull latest</button>
                   <button class="secondary-button" id="syncPush" type="button">Push now</button>
@@ -467,6 +480,7 @@
     </dialog>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=20260702-3"></script>
+    <script src="sync-core.js?v=20261021-1"></script>
+    <script src="app.js?v=20261021-1"></script>
   </body>
 </html>
