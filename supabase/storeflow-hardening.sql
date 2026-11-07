@@ -1,5 +1,9 @@
 -- StoreFlow hardening v2: team-membership RLS, version history, and a server-side revision counter.
--- Additive: no data is modified or removed. Review before applying. NOT yet applied.
+-- Review before applying. NOT yet applied.
+-- Data: no row in public.storeflow_sync is modified or deleted. A snapshot of each existing row is added to
+--   storeflow_sync_history. The trigger keeps the newest 30 'before update' versions per store and prunes older
+--   ones from the history table only (the 'pre-hardening snapshot' rows are never pruned).
+-- Access: all existing policies on storeflow_sync are replaced by team-membership policies. Anonymous access is removed.
 -- After applying, add each approved tester (lowercase email) with:
 --   insert into public.storeflow_members (store_id, email, display_name) values ('19891-test', 'name@example.com', 'Name');
 -- Restore a previous version (run in the Supabase SQL editor; clients will pull it as the newest version):
@@ -71,9 +75,22 @@ from public.storeflow_sync s
 where not exists (select 1 from public.storeflow_sync_history h
                   where h.store_id = s.store_id and h.reason = 'pre-hardening snapshot');
 
-drop policy if exists "storeflow test authenticated select" on public.storeflow_sync;
-drop policy if exists "storeflow test authenticated insert" on public.storeflow_sync;
-drop policy if exists "storeflow test authenticated update" on public.storeflow_sync;
+alter table public.storeflow_sync enable row level security;
+
+-- Remove EVERY existing policy on this table (they are replaced below), so no older permissive
+-- policy can bypass team membership. Policies are access rules only; no rows are touched.
+do $do$
+declare p record;
+begin
+  for p in select policyname from pg_policies where schemaname = 'public' and tablename = 'storeflow_sync' loop
+    execute format('drop policy %I on public.storeflow_sync', p.policyname);
+  end loop;
+end $do$;
+
+-- Explicit grants: anonymous gets nothing; signed-in users can read, insert and update (never delete).
+revoke all on public.storeflow_sync from anon;
+revoke all on public.storeflow_sync from authenticated;
+grant select, insert, update on public.storeflow_sync to authenticated;
 
 create policy "storeflow members select" on public.storeflow_sync for select to authenticated
   using (private.storeflow_is_member(store_id));

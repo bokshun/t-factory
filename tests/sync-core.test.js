@@ -50,14 +50,14 @@ function makeCloud() {
 // ---- fake device ----
 const normalize = (s) => ({ team: [{ id: 't1' }], tasks: [], messages: [], schedule: [], reminders: [], photos: [], ...s });
 function makeDevice(cloud, name, initial, storeId = '19891-test') {
-  const d = { name, state: normalize(initial), meta: null, backups: [], statuses: [] };
+  const d = { name, state: normalize(initial), meta: null, backups: [], statuses: [], backupOk: true };
   d.engine = core.createEngine({
     client: cloud.client, storeId,
     getState: () => ({ ...d.state, activeTimer: null, syncedAt: 'x', appVersion: 'v' }),
     setState: (s) => { d.state = normalize(s); },
     normalize,
     loadMeta: () => d.meta, saveMeta: (m) => { d.meta = m ? JSON.parse(JSON.stringify(m)) : null; },
-    backupLocal: (s) => d.backups.push(JSON.parse(JSON.stringify(s))),
+    backupLocal: (s) => { if (!d.backupOk) return false; d.backups.push(JSON.parse(JSON.stringify(s))); return true; },
     onStatus: (t) => d.statuses.push(t),
   });
   return d;
@@ -179,6 +179,25 @@ async function test(name, fn) { try { await fn(); passed++; console.log('PASS', 
     const cloud = makeCloud(); const a = makeDevice(cloud, 'A', board()); await a.engine.initializeCloud();
     const c = makeDevice(cloud, 'C', board(), 'store-19891'); c.meta = { storeId: '19891-test', rev: 1, base: {} };
     assert.strictEqual((await c.engine.push()).result, 'needs-pull');
+  });
+
+
+  await test('failed/offline push is retried when the cloud revision has not moved', async () => {
+    const cloud = makeCloud(); const a = makeDevice(cloud, 'A', board()); await a.engine.initializeCloud();
+    a.state.tasks.push({ id: 'offline-task' });            // edit made, push never happened (offline)
+    const r = await a.engine.pull();                         // poll finds same cloud revision
+    assert.strictEqual(r.result, 'current'); assert.strictEqual(r.needsPush, true);
+    assert.strictEqual((await a.engine.push()).result, 'pushed');
+    assert.ok(cloud.rows.get('19891-test').data.tasks.some((x) => x.id === 'offline-task'));
+    assert.strictEqual((await a.engine.pull()).needsPush, false);
+  });
+
+  await test('if the local backup fails, the device keeps its board and does not join', async () => {
+    const cloud = makeCloud(); const a = makeDevice(cloud, 'A', board()); await a.engine.initializeCloud();
+    const b = makeDevice(cloud, 'B', { tasks: [{ id: 'b-local' }], messages: [], schedule: [] }); b.backupOk = false;
+    const r = await b.engine.pull();
+    assert.strictEqual(r.result, 'backup-failed'); assert.strictEqual(b.state.tasks[0].id, 'b-local'); assert.strictEqual(b.meta, null);
+    assert.strictEqual((await b.engine.push()).result, 'needs-pull');
   });
 
   await test('unit: mergeStates scalar and array rules', () => {

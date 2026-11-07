@@ -823,8 +823,9 @@ function backupLocalBoard(localState) {
       .sort()
       .slice(0, -3)
       .forEach((key) => localStorage.removeItem(key));
+    return true;
   } catch {
-    /* backup is best-effort; the cloud board is never overwritten either way */
+    return false; // the engine refuses to replace this device's board without a backup
   }
 }
 
@@ -1003,6 +1004,7 @@ const syncResultMessages = {
   'cloud-exists': 'The cloud board already exists. Tap "Pull latest" instead.',
   'cloud-empty': 'The cloud board is empty. Use "Start cloud board" only from the device with the real board.',
   adopted: 'Joined the team board. Your previous local board was backed up on this device.',
+  'backup-failed': 'Could not back up this device\'s current board (storage may be full), so nothing was replaced. Free up space or tell Chris.',
   updated: 'Pulled the latest team board.',
   merged: 'Merged teammate changes with yours.',
   current: 'Already up to date.',
@@ -1023,7 +1025,13 @@ async function pushCloudState(showAlert) {
     if (showAlert) alert('Sign in first.');
     return;
   }
-  const result = await engine.push();
+  let result;
+  try {
+    result = await engine.push();
+  } catch (error) {
+    updateSyncUi('Sync error');
+    result = { result: 'error', error };
+  }
   if (showAlert) alert(syncResultMessages[result.result] || result.result);
   return result;
 }
@@ -1040,7 +1048,13 @@ async function pullCloudState(showAlert) {
     if (showAlert) alert('Sign in first.');
     return;
   }
-  const result = await engine.pull();
+  let result;
+  try {
+    result = await engine.pull();
+  } catch (error) {
+    updateSyncUi('Sync error');
+    result = { result: 'error', error };
+  }
   const init = document.querySelector('#syncInit');
   if (init) init.classList.toggle('is-hidden', result.result !== 'cloud-empty');
   if (result.needsPush) scheduleCloudSave();
@@ -1060,9 +1074,10 @@ async function startCloudBoard() {
 }
 
 function applyRemoteState(remoteState) {
+  const next = normalizeState(remoteState);
+  localStorage.setItem(storageKey, JSON.stringify(next)); // throws if storage is full; the current board stays untouched
   isApplyingRemoteState = true;
-  state = normalizeState(remoteState);
-  localStorage.setItem(storageKey, JSON.stringify(state));
+  state = next;
   isApplyingRemoteState = false;
   render();
 }

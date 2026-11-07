@@ -113,12 +113,20 @@
 
       const meta = metaForStore();
       if (!meta) {
-        deps.backupLocal(deps.getState());
+        if (!deps.backupLocal(deps.getState())) {
+          status('Could not back up this device\'s board, so it was not replaced');
+          return { result: 'backup-failed' };
+        }
         adopt(row);
         status('Joined team board');
         return { result: 'adopted' };
       }
-      if (row.rev === meta.rev) { status('Up to date'); return { result: 'current' }; }
+      if (row.rev === meta.rev) {
+        // Cloud has not moved. If this device still holds unsynced edits (failed or offline push), flag a retry.
+        const unsynced = !same(strip(deps.getState()), meta.base);
+        status(unsynced ? 'Unsynced changes; retrying' : 'Up to date');
+        return { result: 'current', needsPush: unsynced };
+      }
       if (row.rev < meta.rev) { status('Cloud older than this device; not applying'); return { result: 'stale-cloud' }; }
 
       const remote = deps.normalize(row.data);
