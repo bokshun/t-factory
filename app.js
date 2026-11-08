@@ -955,15 +955,16 @@ function schedulePull() {
   syncPullTimer = window.setTimeout(() => pullCloudState(false), 400);
 }
 
-// Realtime is only a "something changed" signal. The board itself is always re-fetched,
-// because Realtime payloads over 1 MB are not delivered. A 30 second poll is the safety net.
+// Realtime watches the tiny storeflow_sync_meta row (the server bumps it on every board write).
+// It is only a "something changed" signal; the board itself is always re-fetched, so the 1 MB
+// Realtime payload limit never applies. A 30 second poll is the safety net.
 function startLiveSync(client, config) {
   stopLiveSync();
   syncChannel = client
     .channel(`storeflow-${config.storeId}`)
     .on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: 'storeflow_sync', filter: `store_id=eq.${config.storeId}` },
+      { event: '*', schema: 'public', table: 'storeflow_sync_meta', filter: `store_id=eq.${config.storeId}` },
       schedulePull
     )
     .subscribe((status) => {

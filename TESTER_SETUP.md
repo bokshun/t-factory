@@ -9,7 +9,7 @@ Do not use these steps until Chris confirms the update is live.
 4. Enter exactly:
    - Store sync ID: `19891-test`
    - Supabase URL and anon key: copy them from the message Chris sent (the key is long; paste it, do not retype).
-5. Enter the email and password Chris created for you, then tap **Sign in**.
+5. Enter your approved email and the password Chris gave you, then tap **Sign in**. Only approved emails can sign in; anyone else is blocked.
 6. Tap **Pull latest**. The status should say it joined the team board. Your own earlier test data on this phone is backed up automatically.
 
 ## Rules while testing

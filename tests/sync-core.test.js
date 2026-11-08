@@ -28,17 +28,17 @@ function makeCloud() {
           const q = { eq(k, v) { f[k] = v; return q; },
             select: async () => {
               const r = rows.get(f.store_id);
-              if (!r || r.rev !== f.rev) return { data: [], error: null };
-              r.data = jsonbize(JSON.parse(JSON.stringify(vals.data))); r.rev += 1; r.updated_at = vals.updated_at;
-              return { data: [{ rev: r.rev }], error: null };
+              if (!r || r.revision !== f.revision) return { data: [], error: null };
+              r.data = jsonbize(JSON.parse(JSON.stringify(vals.data))); r.revision += 1; r.updated_at = vals.updated_at;
+              return { data: [{ revision: r.revision }], error: null };
             } };
           return q;
         },
         insert(vals) {
           return { select: async () => {
             if (rows.has(vals.store_id)) return { data: null, error: { message: 'duplicate key' } };
-            rows.set(vals.store_id, { store_id: vals.store_id, data: jsonbize(JSON.parse(JSON.stringify(vals.data))), rev: 1 });
-            return { data: [{ rev: 1 }], error: null };
+            rows.set(vals.store_id, { store_id: vals.store_id, data: jsonbize(JSON.parse(JSON.stringify(vals.data))), revision: 1 });
+            return { data: [{ revision: 1 }], error: null };
           } };
         },
       };
@@ -77,7 +77,7 @@ async function test(name, fn) { try { await fn(); passed++; console.log('PASS', 
   await test('empty cloud: pull does not upload; init is explicit and insert-only', async () => {
     const cloud = makeCloud(); const a = makeDevice(cloud, 'A', board());
     assert.strictEqual((await a.engine.pull()).result, 'cloud-empty'); assert.strictEqual(cloud.rows.size, 0);
-    assert.strictEqual((await a.engine.initializeCloud()).result, 'initialized'); assert.strictEqual(cloud.rows.get('19891-test').rev, 1);
+    assert.strictEqual((await a.engine.initializeCloud()).result, 'initialized'); assert.strictEqual(cloud.rows.get('19891-test').revision, 1);
   });
 
   await test('empty board is never uploaded (init or push)', async () => {
@@ -170,7 +170,7 @@ async function test(name, fn) { try { await fn(); passed++; console.log('PASS', 
   await test('stale cloud (older rev) never replaces newer local data', async () => {
     const cloud = makeCloud(); const a = makeDevice(cloud, 'A', board()); await a.engine.initializeCloud();
     a.state.tasks.push({ id: 'x' }); await a.engine.push();
-    cloud.rows.get('19891-test').rev = 1; // simulate restored/older replica
+    cloud.rows.get('19891-test').revision = 1; // simulate restored/older replica
     assert.strictEqual((await a.engine.pull()).result, 'stale-cloud');
     assert.ok(a.state.tasks.some((t) => t.id === 'x'));
   });

@@ -101,12 +101,12 @@
     function adopt(row, kind) {
       const remote = deps.normalize(row.data);
       deps.setState(remote);
-      deps.saveMeta({ storeId: deps.storeId, rev: row.rev, base: strip(deps.getState()) });
+      deps.saveMeta({ storeId: deps.storeId, rev: row.revision, base: strip(deps.getState()) });
       return kind;
     }
 
     async function pull() {
-      const { data: row, error } = await table().select('data, rev, updated_at')
+      const { data: row, error } = await table().select('data, revision, updated_at')
         .eq('store_id', deps.storeId).maybeSingle();
       if (error) { status('Sync error'); return { result: 'error', error }; }
       if (!row || !row.data) { status('Cloud board is empty'); return { result: 'cloud-empty' }; }
@@ -121,13 +121,13 @@
         status('Joined team board');
         return { result: 'adopted' };
       }
-      if (row.rev === meta.rev) {
+      if (row.revision === meta.rev) {
         // Cloud has not moved. If this device still holds unsynced edits (failed or offline push), flag a retry.
         const unsynced = !same(strip(deps.getState()), meta.base);
         status(unsynced ? 'Unsynced changes; retrying' : 'Up to date');
         return { result: 'current', needsPush: unsynced };
       }
-      if (row.rev < meta.rev) { status('Cloud older than this device; not applying'); return { result: 'stale-cloud' }; }
+      if (row.revision < meta.rev) { status('Cloud older than this device; not applying'); return { result: 'stale-cloud' }; }
 
       const remote = deps.normalize(row.data);
       const local = deps.getState();
@@ -137,7 +137,7 @@
       const { state, conflicts } = mergeStates(meta.base, local, remote);
       deps.setState(state);
       // Base is the cloud version we merged on top of; local now holds extra changes to push.
-      deps.saveMeta({ storeId: deps.storeId, rev: row.rev, base: strip(remote) });
+      deps.saveMeta({ storeId: deps.storeId, rev: row.revision, base: strip(remote) });
       status(conflicts ? `Merged with ${conflicts} overlapping edit(s)` : 'Merged teammate changes');
       return { result: 'merged', conflicts, needsPush: true };
     }
@@ -157,13 +157,13 @@
           else if (bytes >= WARN_BYTES) status('Board is getting large');
 
           const { data: rows, error } = await table()
-            .update({ data: local, updated_at: new Date().toISOString() })
-            .eq('store_id', deps.storeId).eq('rev', meta.rev).select('rev');
+            .update({ data: local })
+            .eq('store_id', deps.storeId).eq('revision', meta.rev).select('revision');
           if (error) { status('Sync error'); return { result: 'error', error }; }
           if (rows && rows.length === 1) {
-            deps.saveMeta({ storeId: deps.storeId, rev: rows[0].rev, base: strip(local) });
+            deps.saveMeta({ storeId: deps.storeId, rev: rows[0].revision, base: strip(local) });
             status('Synced');
-            return { result: 'pushed', rev: rows[0].rev };
+            return { result: 'pushed', rev: rows[0].revision };
           }
           // Someone else saved first: fetch, merge, retry.
           const pulled = await pull();
@@ -178,14 +178,14 @@
     async function initializeCloud() {
       const local = deps.getState();
       if (isEmptyBoard(local)) { status('Not starting a cloud board from an empty board'); return { result: 'refused-empty' }; }
-      const { data: existing, error: readErr } = await table().select('rev').eq('store_id', deps.storeId).maybeSingle();
+      const { data: existing, error: readErr } = await table().select('revision').eq('store_id', deps.storeId).maybeSingle();
       if (readErr) { status('Sync error'); return { result: 'error', error: readErr }; }
       if (existing) { status('Cloud already has a board; pull instead'); return { result: 'cloud-exists' }; }
-      const { data: rows, error } = await table().insert({ store_id: deps.storeId, data: local, updated_at: new Date().toISOString() }).select('rev');
+      const { data: rows, error } = await table().insert({ store_id: deps.storeId, data: local }).select('revision');
       if (error) { status('Sync error'); return { result: 'error', error }; }
-      deps.saveMeta({ storeId: deps.storeId, rev: rows[0].rev, base: strip(local) });
+      deps.saveMeta({ storeId: deps.storeId, rev: rows[0].revision, base: strip(local) });
       status('Cloud board started');
-      return { result: 'initialized', rev: rows[0].rev };
+      return { result: 'initialized', rev: rows[0].revision };
     }
 
     return { pull, push, initializeCloud, hasMeta: () => Boolean(metaForStore()) };
