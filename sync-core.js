@@ -5,6 +5,10 @@
   else root.StoreFlowSyncCore = factory();
 })(typeof self !== 'undefined' ? self : this, function () {
   const IGNORED_KEYS = ['syncedAt', 'appVersion', 'activeTimer'];
+  // Same list the database uses to decide a board is empty (private.storeflow_is_empty).
+  const BOARD_KEYS = ['tasks', 'messages', 'schedule', 'photos', 'reminders', 'timeEntries'];
+  // Deep copy. App state is mutated in place, so anything awaited across a network call must be a snapshot.
+  const snapshot = (value) => (typeof structuredClone === 'function' ? structuredClone(value) : JSON.parse(JSON.stringify(value)));
   const REALTIME_LIMIT_BYTES = 1024 * 1024; // Supabase Postgres Changes payload cap
   const WARN_BYTES = 800 * 1024;
   const MAX_PUSH_ATTEMPTS = 4;
@@ -28,7 +32,7 @@
 
   function isEmptyBoard(state) {
     const s = state || {};
-    return ['tasks', 'messages', 'schedule'].every((k) => !Array.isArray(s[k]) || s[k].length === 0);
+    return BOARD_KEYS.every((k) => !Array.isArray(s[k]) || s[k].length === 0);
   }
 
   function itemKey(item) {
@@ -92,6 +96,7 @@
     const status = (t) => deps.onStatus && deps.onStatus(t);
     const table = () => deps.client.from('storeflow_sync');
     let pushing = false;
+    let pushAgain = false;
 
     function metaForStore() {
       const m = deps.loadMeta();
@@ -143,13 +148,26 @@
     }
 
     async function push() {
-      if (pushing) return { result: 'busy' };
+      if (pushing) { pushAgain = true; return { result: 'busy' }; }
       pushing = true;
+      let result;
       try {
+        result = await pushOnce();
+      } finally { pushing = false; }
+      // A save was requested while we were uploading: run it now so that edit is not left waiting.
+      if (pushAgain) {
+        pushAgain = false;
+        if (result.result === 'pushed' || result.result === 'nothing-to-push') return push();
+      }
+      return result;
+    }
+
+    async function pushOnce() {
+      {
         for (let attempt = 0; attempt < MAX_PUSH_ATTEMPTS; attempt++) {
           const meta = metaForStore();
           if (!meta) { status('Pull the team board first'); return { result: 'needs-pull' }; }
-          const local = deps.getState();
+          const local = snapshot(deps.getState()); // immutable: used for the request AND the saved baseline
           if (isEmptyBoard(local)) { status('Not pushing an empty board'); return { result: 'refused-empty' }; }
           if (same(strip(local), meta.base)) { status('Up to date'); return { result: 'nothing-to-push' }; }
           const bytes = stable(local).length;
@@ -171,12 +189,12 @@
         }
         status('Busy; will retry on next change');
         return { result: 'conflict-retry-exhausted' };
-      } finally { pushing = false; }
+      }
     }
 
     // Explicit, user-confirmed. Insert only: can never replace an existing cloud board.
     async function initializeCloud() {
-      const local = deps.getState();
+      const local = snapshot(deps.getState());
       if (isEmptyBoard(local)) { status('Not starting a cloud board from an empty board'); return { result: 'refused-empty' }; }
       const { data: existing, error: readErr } = await table().select('revision').eq('store_id', deps.storeId).maybeSingle();
       if (readErr) { status('Sync error'); return { result: 'error', error: readErr }; }

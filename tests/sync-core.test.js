@@ -14,6 +14,7 @@ function jsonbize(v) {
 }
 function makeCloud() {
   const rows = new Map();
+  const hooks = {};
   const client = {
     from() {
       return {
@@ -29,7 +30,7 @@ function makeCloud() {
             select: async () => {
               const r = rows.get(f.store_id);
               if (!r || r.revision !== f.revision) return { data: [], error: null };
-              r.data = jsonbize(JSON.parse(JSON.stringify(vals.data))); r.revision += 1; r.updated_at = vals.updated_at;
+              r.data = jsonbize(JSON.parse(JSON.stringify(vals.data))); r.revision += 1; if (hooks.afterServerSave) hooks.afterServerSave(); r.updated_at = vals.updated_at;
               return { data: [{ revision: r.revision }], error: null };
             } };
           return q;
@@ -44,7 +45,7 @@ function makeCloud() {
       };
     },
   };
-  return { rows, client };
+  return { rows, client, hooks };
 }
 
 // ---- fake device ----
@@ -198,6 +199,48 @@ async function test(name, fn) { try { await fn(); passed++; console.log('PASS', 
     const r = await b.engine.pull();
     assert.strictEqual(r.result, 'backup-failed'); assert.strictEqual(b.state.tasks[0].id, 'b-local'); assert.strictEqual(b.meta, null);
     assert.strictEqual((await b.engine.push()).result, 'needs-pull');
+  });
+
+
+  await test('edit made WHILE an upload is in flight is not lost (in-place mutation)', async () => {
+    const cloud = makeCloud(); const a = makeDevice(cloud, 'A', board()); await a.engine.initializeCloud();
+    a.state.tasks.push({ id: 'first-edit' });
+    cloud.hooks.afterServerSave = () => { cloud.hooks.afterServerSave = null; a.state.tasks.push({ id: 'edit-during-upload' }); };
+    assert.strictEqual((await a.engine.push()).result, 'pushed');
+    assert.ok(!cloud.rows.get('19891-test').data.tasks.some((x) => x.id === 'edit-during-upload'), 'server had only the earlier data');
+    const p = await a.engine.pull();
+    assert.strictEqual(p.needsPush, true, 'poll must report the unsynced edit');
+    assert.strictEqual((await a.engine.push()).result, 'pushed');
+    const ids = cloud.rows.get('19891-test').data.tasks.map((x) => x.id);
+    assert.ok(ids.includes('first-edit') && ids.includes('edit-during-upload'));
+  });
+
+  await test('a save requested during an in-flight upload is queued, not dropped', async () => {
+    const cloud = makeCloud(); const a = makeDevice(cloud, 'A', board()); await a.engine.initializeCloud();
+    a.state.tasks.push({ id: 'first-edit' });
+    let during;
+    cloud.hooks.afterServerSave = () => { cloud.hooks.afterServerSave = null; a.state.tasks.push({ id: 'second-edit' }); during = a.engine.push(); };
+    await a.engine.push();
+    assert.strictEqual((await during).result, 'busy');
+    const ids = cloud.rows.get('19891-test').data.tasks.map((x) => x.id);
+    assert.ok(ids.includes('first-edit') && ids.includes('second-edit'), 'queued save ran automatically');
+  });
+
+  await test('start-cloud-board also snapshots (edit during insert is not lost)', async () => {
+    const cloud = makeCloud(); const a = makeDevice(cloud, 'A', board());
+    const origInsert = cloud.client.from().insert;
+    const wrapped = { from() { const t = cloud.client.from(); return { select: t.select, update: t.update, insert(v) { const q = origInsert(v); return { select: async () => { const out = await q.select(); a.state.tasks.push({ id: 'edit-during-init' }); return out; } }; } }; } };
+    const b = makeDevice({ rows: cloud.rows, client: wrapped, hooks: cloud.hooks }, 'A2', board()); b.state = a.state;
+    assert.strictEqual((await b.engine.initializeCloud()).result, 'initialized');
+    assert.strictEqual((await b.engine.pull()).needsPush, true);
+  });
+
+  await test('boards with only photos / reminders / time entries count as non-empty (match server)', async () => {
+    for (const key of ['photos', 'reminders', 'timeEntries']) {
+      const cloud = makeCloud(); const a = makeDevice(cloud, 'A', { tasks: [], messages: [], schedule: [], [key]: [{ id: 'x' }] });
+      assert.strictEqual((await a.engine.initializeCloud()).result, 'initialized', key);
+    }
+    assert.strictEqual(core.isEmptyBoard({ tasks: [], messages: [], schedule: [], photos: [], reminders: [], timeEntries: [] }), true);
   });
 
   await test('unit: mergeStates scalar and array rules', () => {
