@@ -236,7 +236,7 @@ const companyStandards = [
 const sampleState = {
   team: [
     { id: 't1', name: 'Chris C.', role: 'Store Manager', strength: 'workflow and compliance' },
-    { id: 't2', name: 'Sarah I.', role: 'Assistant Store Manager', strength: 'opening manager and compliance' },
+    { id: 't2', name: 'Sanah I.', role: 'Assistant Store Manager', strength: 'opening manager and compliance' },
     { id: 't12', name: 'Nathan H.', role: 'Sales Associate', strength: 'sales floor support' },
     { id: 't4', name: 'Blaire M.', role: 'Key Holder', strength: 'stocking and closing coverage' },
     { id: 't5', name: 'Elvis J.', role: 'Sales Associate', strength: 'recovery and closing' },
@@ -263,7 +263,7 @@ const sampleState = {
       title: 'Complete safety walk and temperature checks',
       category: 'compliance',
       priority: 'high',
-      owner: 'Sarah I.',
+      owner: 'Sanah I.',
       due: isoToday,
       notes: 'Log issues before noon and assign fixes immediately.',
       done: false
@@ -338,7 +338,7 @@ const sampleState = {
   ],
   messages: [
     { id: 'm1', from: 'Chris C.', body: 'Morning focus: compliance first, then training, then seasonal reset progress.', time: '7:12 AM' },
-    { id: 'm2', from: 'Sarah I.', body: 'Safety walk started. I will update once temperature checks are logged.', time: '8:06 AM' }
+    { id: 'm2', from: 'Sanah I.', body: 'Safety walk started. I will update once temperature checks are logged.', time: '8:06 AM' }
   ],
   photos: [],
   assistantDecision: null,
@@ -346,7 +346,7 @@ const sampleState = {
   reminders: [
     { id: 'r1', title: 'Inventory countdown check', due: isoToday, owner: 'Chris C.', notes: 'Review open inventory prep tasks and assign each one before shift change.', done: false },
     { id: 'r2', title: 'Backroom readiness check', due: addDays(2), owner: 'Blaire M.', notes: 'Confirm rolltainers, totes, and staged freight are organized for counting.', done: false },
-    { id: 'r3', title: 'Final sales floor recovery push', due: '2026-06-24', owner: 'Sarah I.', notes: 'Full store recovery before inventory day on June 25, 2026.', done: false }
+    { id: 'r3', title: 'Final sales floor recovery push', due: '2026-06-24', owner: 'Sanah I.', notes: 'Full store recovery before inventory day on June 25, 2026.', done: false }
   ],
   timeEntries: [],
   activeTimer: null
@@ -484,7 +484,7 @@ function normalizeState(savedState) {
 
 function migratePlaceholderNames(targetState) {
   const replacements = {
-    Maya: 'Sarah I.',
+    Maya: 'Sanah I.',
     Jordan: 'Jazmin G.',
     Devin: 'Carlton R.',
     Chris: 'Chris C.'
@@ -532,6 +532,11 @@ function migratePlaceholderNames(targetState) {
   targetState.timeEntries = targetState.timeEntries.map((entry) => ({
     ...entry,
     owner: replaceName(entry.owner)
+  }));
+
+  targetState.schedulePdfs = targetState.schedulePdfs.map((reference) => ({
+    ...reference,
+    owner: replaceName(reference.owner)
   }));
 }
 
@@ -674,7 +679,7 @@ function applyAccessControls() {
   const hint = document.querySelector('#accessHint');
   if (hint) {
     hint.textContent = canUseManagerTools()
-      ? 'Select Manager / Assistant Manager for Margarette L. and Key holder for Blaire. Device views are separate from sign-in.'
+      ? 'Select Manager / Assistant Manager for Margarette L. or Sanah I. and Key holder for Blaire. Device views are separate from sign-in.'
       : 'This phone is limited to the work this role should see. Ask a manager for changes to schedule, uploads, sync, or store setup.';
   }
 
