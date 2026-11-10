@@ -1178,3 +1178,24 @@ menu {
     gap: 4px;
   }
 }
+
+/* Task cards and schedule days scroll inside their own rows. */
+.task-board, #priorityTaskList, #inventoryTaskList {
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(min(82vw, 16rem), min(82vw, 24rem));
+  justify-content: start;
+  align-items: start;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  padding-bottom: .75rem;
+}
+.task-board > *, #priorityTaskList > *, #inventoryTaskList > * { scroll-snap-align: start; min-width: 0; }
+.task-card { grid-template-columns: minmax(0, 1fr) auto; overflow-wrap: anywhere; }
+.panel, .main { min-width: 0; }
+.operations-alert {
+  padding: .8rem 1rem;
+  border: 1px solid var(--line);
+  border-left: 4px solid #a05a00;
+  border-radius: .5rem;
+  background: #fff5d5;
+}
