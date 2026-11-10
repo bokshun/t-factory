@@ -1,9 +1,10 @@
-const cacheName = 'dg-storeflow-v13';
-const assetVersion = '20261021-1';
+const cacheName = 'dg-storeflow-v14';
+const assetVersion = '20261109-1';
 const appShell = [
   './',
   './index.html',
   `./styles.css?v=${assetVersion}`,
+  `./operations.js?v=${assetVersion}`,
   `./sync-core.js?v=${assetVersion}`,
   `./app.js?v=${assetVersion}`,
   `./manifest.webmanifest?v=${assetVersion}`,
@@ -19,20 +20,33 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== cacheName).map((key) => caches.delete(key))))
+      .then((keys) => Promise.all(keys.filter((key) => key.startsWith('dg-storeflow-') && key !== cacheName).map((key) => caches.delete(key))))
   );
   self.clients.claim();
 });
 
+const shellUrls = new Set(appShell.map((path) => new URL(path, self.registration.scope).href));
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
+  if (event.request.method !== 'GET' || url.origin !== self.location.origin) return;
+  const appPage = event.request.mode === 'navigate' &&
+    [new URL('./', self.registration.scope).pathname, new URL('./index.html', self.registration.scope).pathname].includes(url.pathname);
+  if (!appPage && !shellUrls.has(url.href)) return;
   event.respondWith(
-    fetch(event.request)
-      .then((response) => {
+    fetch(event.request).then((response) => {
+      if (response.ok) {
         const copy = response.clone();
-        caches.open(cacheName).then((cache) => cache.put(event.request, copy));
-        return response;
-      })
-      .catch(() => caches.match(event.request).then((cached) => cached || caches.match('./index.html')))
+        caches.open(cacheName).then((cache) => cache.put(appPage ? './index.html' : event.request, copy)).catch(() => {});
+      }
+      return response;
+    }).catch(() => caches.match(appPage ? './index.html' : event.request).then((cached) => cached || Response.error()))
   );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(self.clients.matchAll({ type: 'window' }).then((clients) => {
+    const app = clients.find((client) => client.url.startsWith(self.registration.scope));
+    return app ? app.focus() : self.clients.openWindow(self.registration.scope);
+  }));
 });

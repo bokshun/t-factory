@@ -68,9 +68,11 @@
             <p class="app-version" id="appVersionLabel"></p>
           </div>
           <div class="top-actions">
+            <button class="secondary-button" id="enableAlerts" type="button">Enable alerts</button>
             <button class="primary-button" id="openTaskModal" type="button">New Task</button>
           </div>
         </header>
+        <p id="operationsAlert" class="operations-alert" role="status" hidden></p>
 
         <section class="view active" id="dashboardView" aria-labelledby="pageTitle">
           <div class="hero-panel">
@@ -95,6 +97,7 @@
                 <h3>Daily Assistant Plan</h3>
                 <button class="text-button" id="buildRoutineChecks" type="button">Create routine checks</button>
               </div>
+              <p class="suggestion" id="recoveryPhase"></p>
               <div class="assistant-plan" id="assistantPlan"></div>
               <form class="manager-update-form" id="managerUpdateForm">
                 <label>
@@ -129,7 +132,8 @@
 
         <section class="view" id="tasksView">
           <div class="filters">
-            <button class="filter-chip active" data-filter="all" type="button">All</button>
+            <button class="filter-chip active" data-filter="all" type="button">Open</button>
+            <button class="filter-chip" data-filter="completed" type="button">Completed</button>
             <button class="filter-chip" data-filter="compliance" type="button">Compliance</button>
             <button class="filter-chip" data-filter="training" type="button">Training</button>
             <button class="filter-chip" data-filter="planogram" type="button">Planograms</button>
@@ -137,7 +141,8 @@
             <button class="filter-chip" data-filter="inventory" type="button">Event Prep</button>
             <button class="filter-chip" data-filter="schedule" type="button">Schedule</button>
           </div>
-          <div class="task-board" id="taskBoard"></div>
+          <p class="form-hint">Swipe sideways to see more tasks. Finished tasks move to Completed.</p>
+          <div class="task-board" id="taskBoard" tabindex="0" aria-label="Tasks, scroll horizontally"></div>
         </section>
 
         <section class="view" id="inventoryView">
@@ -200,17 +205,18 @@
                 </div>
               </div>
               <div class="schedule-stats" id="scheduleStats"></div>
-              <div class="schedule-grid" id="scheduleGrid"></div>
+              <p class="form-hint" id="scheduleWeekSource"></p>
+              <div class="schedule-grid" id="scheduleGrid" tabindex="0" aria-label="Schedule, scroll horizontally"></div>
             </section>
 
             <section class="panel schedule-pdf-panel">
               <div class="panel-heading">
-                <h3>Schedule PDF Import</h3>
+                <h3>Import published schedule</h3>
               </div>
               <form class="schedule-pdf-form" id="schedulePdfForm">
                 <label>
-                  Published schedule PDF
-                  <input id="schedulePdfInput" type="file" accept="application/pdf,.pdf" required />
+                  Published schedule PDF or CSV
+                  <input id="schedulePdfInput" type="file" accept="application/pdf,.pdf,text/csv,.csv,.tsv" />
                 </label>
                 <div class="two-col">
                   <label>
@@ -229,8 +235,17 @@
                   Review notes
                   <textarea id="schedulePdfNotes" rows="3" placeholder="Example: Verify everyone from the published schedule is entered into Week 2."></textarea>
                 </label>
-                <button class="primary-button" type="submit">Upload PDF</button>
-                <p class="form-hint">PDF upload stores the published schedule as a reference and creates a review task. Roster changes after shifts are entered or adjusted in the schedule grid.</p>
+                <label>Week start (first date on the published schedule)
+                  <input id="scheduleImportStart" type="date" />
+                </label>
+                <label>Shifts to review and apply
+                  <textarea id="scheduleImportRows" rows="4" placeholder="YYYY-MM-DD, Name, 09:00, 17:00"></textarea>
+                </label>
+                <div class="form-row actions-row">
+                  <button class="secondary-button" id="scheduleRead" type="button">Read file</button>
+                  <button class="primary-button" type="submit">Apply reviewed week</button>
+                </div>
+                <p id="scheduleImportStatus" class="form-hint" role="status">Choose Week 1 or Week 2. Check the shifts against the published schedule before applying. If the file covers both weeks, apply each week separately.</p>
               </form>
             </section>
 
@@ -245,7 +260,7 @@
             <section class="panel">
               <div class="panel-heading">
                 <h3>Today’s Coverage</h3>
-                <button class="text-button" id="addShift" type="button">Add shift</button>
+                <button class="text-button" id="addShift" type="button">Enter shifts</button>
               </div>
               <div class="schedule-list" id="scheduleList"></div>
             </section>
@@ -472,6 +487,10 @@
           Notes
           <textarea id="taskNotes" rows="3" placeholder="Add clear direction, Compass reference, or location."></textarea>
         </label>
+        <div class="two-col">
+          <label>Due time (optional)<input id="taskDueTime" type="time" /></label>
+          <label>Timer alarm after minutes (optional)<input id="taskAlarmMinutes" type="number" min="1" max="480" /></label>
+        </div>
         <menu>
           <button class="secondary-button" value="cancel" type="submit">Cancel</button>
           <button class="primary-button" id="saveTask" value="default" type="submit">Save Task</button>
@@ -479,8 +498,22 @@
       </form>
     </dialog>
 
+    <dialog id="workCheckDialog">
+      <form method="dialog" class="modal-card">
+        <h3>What happened to the running task?</h3>
+        <p class="form-hint">Confirm what happened so the timer doesn’t guess. If the gap includes time you didn’t work, ask a manager to correct the log.</p>
+        <div class="form-row actions-row">
+          <button class="secondary-button" value="working">Still working</button>
+          <button class="secondary-button" value="interrupted">Interrupted</button>
+          <button class="secondary-button" value="break">On break</button>
+          <button class="secondary-button" value="finished">Finished</button>
+          <button class="secondary-button" value="changed">Changed task</button>
+        </div>
+      </form>
+    </dialog>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="sync-core.js?v=20261021-1"></script>
-    <script src="app.js?v=20261021-1"></script>
+    <script src="operations.js?v=20261109-1"></script>
+    <script src="sync-core.js?v=20261109-1"></script>
+    <script src="app.js?v=20261109-1"></script>
   </body>
 </html>

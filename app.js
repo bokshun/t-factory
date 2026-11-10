@@ -1,7 +1,17 @@
 const storageKey = 'dg-storeflow-state-v1';
 const syncConfigKey = 'dg-storeflow-sync-config-v1';
 const accessProfileKey = 'dg-storeflow-access-profile-v1';
-const appVersion = '2026.10.21.1';
+const appVersion = '2026.11.09.1';
+const ops = window.StoreFlowOperations;
+const alertSettingsKey = 'dg-storeflow-operations-alerts-v1';
+let alertsEnabled = localStorage.getItem(alertSettingsKey) === 'on';
+const firedAlerts = new Set();
+let hiddenSince = 0;
+let checkTaskId = '';
+let dismissedAlertTimer = null;
+let importReadToken = 0;
+let importDraft = null;
+let alertAudio = null;
 
 let syncSaveTimer = null;
 let syncChannel = null;
@@ -18,7 +28,7 @@ let syncVisibilityBound = false;
 let isApplyingRemoteState = false;
 
 const today = new Date();
-const isoToday = today.toISOString().slice(0, 10);
+const isoToday = ops.dateKey(today);
 const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const inventoryDate = '2026-06-25';
 const inventoryLabel = 'June 25, 2026';
@@ -28,7 +38,6 @@ const defaultPlanningEvent = {
   date: '2026-07-15',
   focus: 'clearance'
 };
-const scheduleStartDate = '2026-06-13';
 
 const sevenDayWorkflow = [
   {
@@ -228,13 +237,14 @@ const sampleState = {
   team: [
     { id: 't1', name: 'Chris C.', role: 'Store Manager', strength: 'workflow and compliance' },
     { id: 't2', name: 'Sarah I.', role: 'Assistant Store Manager', strength: 'opening manager and compliance' },
-    { id: 't3', name: 'Alicia T.', role: 'Sales Associate', strength: 'front end and customer coverage' },
-    { id: 't4', name: 'Blaire M.', role: 'Sales Associate', strength: 'stocking and closing coverage' },
+    { id: 't12', name: 'Nathan H.', role: 'Sales Associate', strength: 'sales floor support' },
+    { id: 't4', name: 'Blaire M.', role: 'Key Holder', strength: 'stocking and closing coverage' },
     { id: 't5', name: 'Elvis J.', role: 'Sales Associate', strength: 'recovery and closing' },
     { id: 't6', name: 'Louis C.', role: 'Sales Associate', strength: 'core freight and sales floor support' },
     { id: 't7', name: 'Carlton R.', role: 'Sales Associate', strength: 'recovery and planogram support' },
     { id: 't8', name: 'Jazmin G.', role: 'Sales Associate', strength: 'register and truck support' },
-    { id: 't9', name: 'Jeff H.', role: 'Sales Associate', strength: 'closing coverage' },
+    { id: 't13', name: 'Dominic S.', role: 'Sales Associate', strength: 'sales floor support' },
+    { id: 't11', name: 'Margarette L.', role: 'Assistant Store Manager', strength: 'shift leadership' },
     { id: 't10', name: 'Asael H.', role: 'Sales Associate', strength: 'closing coverage' }
   ],
   tasks: [
@@ -293,7 +303,7 @@ const sampleState = {
       title: 'Inventory prep: recover and clean first 30 feet',
       category: 'inventory',
       priority: 'high',
-      owner: 'Alicia T.',
+      owner: 'Chris C.',
       due: addDays(1),
       notes: 'Front end, checkout, seasonal entry, and high-traffic areas must stay faced and clean.',
       done: false
@@ -319,8 +329,9 @@ const sampleState = {
       done: false
     }
   ],
-  schedule: buildSampleSchedule(),
+  schedule: [],
   schedulePdfs: [],
+  scheduleWeeks: [],
   compassNotes: [
     { id: 'c1', title: '7-day setup', body: 'T-Day is Friday. P-Day is Tuesday. Pre-open stocking is yes. Dedicated delivery store is no.' },
     { id: 'c2', title: 'Daily reminder', body: 'Assign one owner per workflow task and check progress before shift change.' }
@@ -375,6 +386,7 @@ render();
 registerServiceWorker();
 clearOldAppCaches();
 connectCloudSync();
+window.setInterval(refreshOperations, 1000);
 
 function addDays(days) {
   const date = new Date();
@@ -389,69 +401,12 @@ function addDaysToDate(value, days) {
 }
 
 function getCurrentScheduleWeek() {
-  const current = new Date(`${isoToday}T12:00:00`);
-  const start = new Date(`${scheduleStartDate}T12:00:00`);
-  const offset = Math.floor((current - start) / (7 * 86400000));
-  return Math.min(1, Math.max(0, offset));
+  const current = ops.dateKey();
+  const [, secondWeek] = ops.scheduleWeekStarts(state.scheduleWeeks, current);
+  return current >= secondWeek && current <= ops.shiftDate(secondWeek, 6) ? 1 : 0;
 }
 
-function buildSampleSchedule() {
-  const weekOne = [
-    ['2026-06-13', 'Alicia T.', 'Sales Associate', '06:00', '15:00', 'Front end, recovery, and customer coverage'],
-    ['2026-06-13', 'Chris C.', 'Store Manager', '06:00', '15:00', 'Manager coverage, workflow, and truck direction'],
-    ['2026-06-13', 'Elvis J.', 'Sales Associate', '06:00', '15:00', 'Stocking and recovery'],
-    ['2026-06-13', 'Louis C.', 'Sales Associate', '06:00', '15:00', 'Core freight and sales floor support'],
-    ['2026-06-13', 'Blaire M.', 'Sales Associate', '08:00', '16:00', 'Register, totes, and recovery'],
-    ['2026-06-14', 'Blaire M.', 'Sales Associate', '06:00', '15:00', 'Front end and stocking'],
-    ['2026-06-14', 'Chris C.', 'Store Manager', '06:00', '15:00', 'Manager coverage and daily planner'],
-    ['2026-06-14', 'Louis C.', 'Sales Associate', '06:00', '15:00', 'Stocking support'],
-    ['2026-06-14', 'Carlton R.', 'Sales Associate', '15:15', '23:15', 'Closing recovery'],
-    ['2026-06-15', 'Sarah I.', 'Assistant Store Manager', '07:45', '15:15', 'Opening manager and compliance'],
-    ['2026-06-15', 'Jazmin G.', 'Sales Associate', '08:00', '15:00', 'Register and recovery'],
-    ['2026-06-15', 'Blaire M.', 'Sales Associate', '15:15', '23:15', 'Closing coverage'],
-    ['2026-06-15', 'Chris C.', 'Store Manager', '15:15', '23:15', 'Closing manager and inventory prep'],
-    ['2026-06-16', 'Sarah I.', 'Assistant Store Manager', '06:00', '14:00', 'P-Day, fresh truck, and workflow'],
-    ['2026-06-16', 'Alicia T.', 'Sales Associate', '08:00', '15:00', 'Front end and Compliance Tuesday support'],
-    ['2026-06-16', 'Carlton R.', 'Sales Associate', '08:00', '13:30', 'Recovery and sky shelves'],
-    ['2026-06-16', 'Jazmin G.', 'Sales Associate', '08:00', '15:00', 'Register and planogram support'],
-    ['2026-06-16', 'Chris C.', 'Store Manager', '13:15', '17:30', 'Inventory prep and follow-up'],
-    ['2026-06-16', 'Elvis J.', 'Sales Associate', '15:15', '23:15', 'Closing recovery'],
-    ['2026-06-17', 'Sarah I.', 'Assistant Store Manager', '07:45', '15:00', 'Backstock and opening direction'],
-    ['2026-06-17', 'Chris C.', 'Store Manager', '08:00', '15:00', 'Inventory prep and manager coverage'],
-    ['2026-06-17', 'Elvis J.', 'Sales Associate', '15:15', '23:15', 'Closing recovery'],
-    ['2026-06-17', 'Blaire M.', 'Sales Associate', '15:15', '23:15', 'Closing coverage'],
-    ['2026-06-18', 'Chris C.', 'Store Manager', '06:00', '15:00', 'Fresh damages, rotation, and manager coverage'],
-    ['2026-06-18', 'Sarah I.', 'Assistant Store Manager', '08:00', '13:00', 'Front end and inventory prep'],
-    ['2026-06-18', 'Carlton R.', 'Sales Associate', '13:15', '16:30', 'Recovery and stock support'],
-    ['2026-06-18', 'Asael H.', 'Sales Associate', '15:15', '23:15', 'Closing coverage'],
-    ['2026-06-18', 'Elvis J.', 'Sales Associate', '15:15', '23:15', 'Closing recovery'],
-    ['2026-06-19', 'Chris C.', 'Store Manager', '07:45', '16:45', 'T-Day planning, receive truck, and toppers/totes'],
-    ['2026-06-19', 'Alicia T.', 'Sales Associate', '08:00', '15:00', 'Truck and front end support'],
-    ['2026-06-19', 'Jazmin G.', 'Sales Associate', '08:00', '15:00', 'Register and truck support'],
-    ['2026-06-19', 'Sarah I.', 'Assistant Store Manager', '08:00', '14:00', 'Inventory prep and floor recovery'],
-    ['2026-06-19', 'Carlton R.', 'Sales Associate', '15:15', '23:15', 'Closing recovery'],
-    ['2026-06-19', 'Jeff H.', 'Sales Associate', '15:15', '23:15', 'Closing coverage']
-  ];
 
-  const weekTwo = weekOne.map(([date, name, position, start, end, direction], index) => [
-    addDaysToDate(date, 7),
-    name,
-    position,
-    start,
-    end,
-    index % 3 === 0 ? 'Inventory week prep, recovery, and count readiness' : direction
-  ]);
-
-  return [...weekOne, ...weekTwo].map(([date, name, position, start, end, direction], index) => ({
-    id: `s${index + 1}`,
-    date,
-    name,
-    position,
-    start,
-    end,
-    direction
-  }));
-}
 
 function normalizeSchedule(schedule) {
   return schedule
@@ -513,6 +468,7 @@ function normalizeState(savedState) {
     tasks: savedState.tasks || sampleState.tasks,
     schedule: normalizeSchedule(savedState.schedule || sampleState.schedule),
     schedulePdfs: savedState.schedulePdfs || [],
+    scheduleWeeks: Array.isArray(savedState.scheduleWeeks) ? savedState.scheduleWeeks : [],
     compassNotes: savedState.compassNotes || sampleState.compassNotes,
     messages: savedState.messages || sampleState.messages,
     photos: savedState.photos || [],
@@ -534,7 +490,7 @@ function migratePlaceholderNames(targetState) {
     Chris: 'Chris C.'
   };
 
-  const replaceName = (value) => replacements[value] || value;
+  const replaceName = (value) => value ? ops.staffName(replacements[value] || value) : value;
   const replaceText = (value) => {
     if (!value) return value;
     return Object.entries(replacements).reduce(
@@ -597,7 +553,7 @@ function loadAccessProfile() {
   if (urlRole) {
     const profile = {
       role: urlRole,
-      member: urlMember || (urlRole === 'manager' ? 'Chris C.' : '')
+      member: ops.staffName(urlMember) || (urlRole === 'manager' ? 'Chris C.' : '')
     };
     localStorage.setItem(accessProfileKey, JSON.stringify(profile));
     return profile;
@@ -613,8 +569,8 @@ function loadAccessProfile() {
 
 function normalizeAccessProfile(profile = {}) {
   return {
-    role: normalizeAccessRole(profile.role) || 'manager',
-    member: profile.member || 'Chris C.'
+    role: normalizeAccessRole(profile?.role) || 'manager',
+    member: ops.staffName(profile?.member) || 'Chris C.'
   };
 }
 
@@ -659,7 +615,7 @@ function canUseManagerTools() {
 
 function canWorkTask(task) {
   if (!isAssociateAccess()) return true;
-  return !currentAccess.member || task.owner === currentAccess.member;
+  return Boolean(currentAccess.member) && ops.staffName(task.owner) === currentAccess.member;
 }
 
 function getVisibleTasks(tasks = state.tasks) {
@@ -718,7 +674,7 @@ function applyAccessControls() {
   const hint = document.querySelector('#accessHint');
   if (hint) {
     hint.textContent = canUseManagerTools()
-      ? 'Manager mode is for you, Sarah, and Margaret. Associates should use an associate link so they only see assigned work and team messages.'
+      ? 'Select Manager / Assistant Manager for Margarette L. and Key holder for Blaire. Device views are separate from sign-in.'
       : 'This phone is limited to the work this role should see. Ask a manager for changes to schedule, uploads, sync, or store setup.';
   }
 
@@ -761,7 +717,7 @@ function clearOldAppCaches() {
     .then((keys) =>
       Promise.all(
         keys
-          .filter((key) => key.startsWith('dg-storeflow-') && key !== 'dg-storeflow-v13')
+          .filter((key) => key.startsWith('dg-storeflow-') && key !== 'dg-storeflow-v14')
           .map((key) => caches.delete(key))
       )
     )
@@ -1076,11 +1032,27 @@ async function startCloudBoard() {
 
 function applyRemoteState(remoteState) {
   const next = normalizeState(remoteState);
+  const localTimer = state.activeTimer;
+  const meta = loadSyncMeta();
+  const hadJoined = alertsEnabled && meta && meta.storeId === getSyncConfig().storeId;
+  const knownMessages = hadJoined ? new Set(state.messages.map((message) => message.id)) : null;
+  const priorTasks = hadJoined ? new Map(state.tasks.map((task) => [task.id, task])) : null;
+  // Cloud payloads intentionally exclude the device's running timer.
+  if (localTimer && next.tasks.some((task) => task.id === localTimer.taskId && !task.done)) next.activeTimer = localTimer;
+  else next.activeTimer = null;
   localStorage.setItem(storageKey, JSON.stringify(next)); // throws if storage is full; the current board stays untouched
   isApplyingRemoteState = true;
   state = next;
   isApplyingRemoteState = false;
   render();
+  if (knownMessages) {
+    const newMessages = next.messages.filter((message) => !knownMessages.has(message.id) && message.from !== currentAccess.member);
+    const newAssignments = next.tasks.filter((task) => !task.done && task.owner === currentAccess.member && priorTasks.get(task.id)?.owner !== currentAccess.member);
+    const items = [];
+    if (newAssignments.length) items.push(newAssignments.length + ' new assignment(s)');
+    if (newMessages.length) items.push(newMessages.length + ' new team message(s)');
+    if (items.length) postOperationsAlert('Team update', items.join(' · '));
+  }
 }
 
 function bindEvents() {
@@ -1106,7 +1078,7 @@ function bindEvents() {
       activeScheduleWeek = Number(button.dataset.scheduleWeek);
       document.querySelectorAll('[data-schedule-week]').forEach((tab) => tab.classList.remove('active'));
       button.classList.add('active');
-      renderSchedule();
+      showScheduleWeek(activeScheduleWeek);
     });
   });
 
@@ -1145,23 +1117,7 @@ function bindEvents() {
     renderMessages();
   });
 
-  document.querySelector('#addShift').addEventListener('click', () => {
-    if (!canUseManagerTools()) return alert('Only manager access can edit shifts.');
-    const roster = getRosterFromSchedule();
-    const next = roster[state.schedule.length % roster.length] || getFallbackOwner();
-    const date = addDaysToDate(scheduleStartDate, activeScheduleWeek * 7);
-    state.schedule.push({
-      id: crypto.randomUUID(),
-      name: next.name,
-      position: 'Assigned Coverage',
-      date,
-      start: '09:00',
-      end: '13:00',
-      direction: 'Add shift direction based on store needs.'
-    });
-    saveState();
-    renderSchedule();
-  });
+
 
   document.querySelector('#addCompassNote').addEventListener('click', () => {
     if (!canUseManagerTools()) return alert('Only manager access can add Compass notes.');
@@ -1185,7 +1141,19 @@ function bindEvents() {
   document.querySelector('#addReminder').addEventListener('click', addInventoryReminder);
   document.querySelector('#addInventoryPlan').addEventListener('click', addInventoryPrepPlan);
   document.querySelector('#eventSetupForm').addEventListener('submit', updatePlanningEvent);
-  document.querySelector('#schedulePdfForm').addEventListener('submit', handleSchedulePdfUpload);
+  document.querySelector('#schedulePdfForm').addEventListener('submit', applyScheduleImport);
+  document.querySelector('#scheduleRead').addEventListener('click', readScheduleImport);
+  document.querySelector('#addShift').addEventListener('click', () => {
+    if (canUseManagerTools()) document.querySelector('#scheduleImportRows').focus();
+  });
+  document.querySelector('#schedulePdfInput').addEventListener('change', () => { importReadToken++; importDraft = null; });
+  document.querySelector('#schedulePdfWeek').addEventListener('change', (event) => {
+    showScheduleWeek(Number(event.target.value));
+  });
+  document.querySelector('#enableAlerts').addEventListener('click', toggleOperationsAlerts);
+  document.addEventListener('pointerdown', unlockAlertAudio);
+  document.querySelector('#workCheckDialog').addEventListener('close', handleWorkCheck);
+  document.addEventListener('visibilitychange', handleWorkVisibility);
   document.querySelector('#clearSchedulePdfs').addEventListener('click', () => {
     if (!canUseManagerTools()) return alert('Only manager access can clear schedule PDFs.');
     state.schedulePdfs = [];
@@ -1251,6 +1219,8 @@ function createTask() {
     priority: document.querySelector('#taskPriority').value,
     owner: document.querySelector('#taskOwner').value,
     due: document.querySelector('#taskDue').value,
+    dueTime: document.querySelector('#taskDueTime').value,
+    alarmMinutes: Number(document.querySelector('#taskAlarmMinutes').value) || null,
     notes: document.querySelector('#taskNotes').value.trim(),
     done: false
   });
@@ -1402,54 +1372,137 @@ async function handlePhotoUpload(event) {
   render();
 }
 
-async function handleSchedulePdfUpload(event) {
-  event.preventDefault();
-  if (!canUseManagerTools()) return alert('Only manager access can upload schedule PDFs.');
-  const file = document.querySelector('#schedulePdfInput').files[0];
-  if (!file) return;
+function showScheduleWeek(week) {
+  activeScheduleWeek = week;
+  const starts = ops.scheduleWeekStarts(state.scheduleWeeks, ops.dateKey());
+  document.querySelector('#scheduleImportStart').value = starts[week];
+  document.querySelector('#scheduleGrid').scrollLeft = 0;
+  renderSchedule();
+  renderSchedulePdfs();
+}
 
-  const selectedOwner = document.querySelector('#schedulePdfOwner').value;
-  const owner = isLeadershipRole(getRoleForName(selectedOwner)) ? selectedOwner : getLeadershipOwner();
-  const week = Number(document.querySelector('#schedulePdfWeek').value);
-  const notes = document.querySelector('#schedulePdfNotes').value.trim() || 'Review the uploaded published schedule PDF and update shifts on the Schedule tab.';
-  const dataUrl = file.size <= 3500000 ? await readFileAsDataUrl(file) : '';
-  const rawText = await extractLoosePdfText(file);
+function importStatus(message) {
+  document.querySelector('#scheduleImportStatus').textContent = message;
+}
 
-  const pdf = {
-    id: crypto.randomUUID(),
-    name: file.name,
-    size: file.size,
-    week,
-    owner,
-    notes,
-    createdAt: new Date().toISOString(),
-    dataUrl,
-    extractedText: rawText
-  };
-
-  state.schedulePdfs.unshift(pdf);
-  state.tasks.unshift({
-    id: crypto.randomUUID(),
-    title: `Review schedule PDF: Week ${week + 1}`,
-    category: 'schedule',
-    priority: 'high',
-    owner,
-    due: isoToday,
-    notes: `${notes} Use the PDF reference to verify shifts, then update the Schedule tab so the roster refreshes.`,
-    schedulePdfId: pdf.id,
-    done: false
-  });
-
-  if (!saveState()) {
-    state.schedulePdfs.shift();
-    state.tasks.shift();
-    alert('That PDF is too large to save in this local browser app. Try a smaller PDF, or upload it as a schedule photo/reference instead.');
-    return;
+async function extractSchedulePdf(file) {
+  // Loaded only on demand from the same CDN StoreFlow already uses. The file is parsed on the device.
+  const base = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.6.205/legacy/build/';
+  const pdfjs = await import(base + 'pdf.min.mjs');
+  pdfjs.GlobalWorkerOptions.workerSrc = base + 'pdf.worker.min.mjs';
+  const document = await pdfjs.getDocument({ data: await file.arrayBuffer(), isEvalSupported: false }).promise;
+  try {
+    const lines = [];
+    for (let page = 1; page <= Math.min(document.numPages, 30); page++) {
+      const content = await (await document.getPage(page)).getTextContent();
+      let line = '', lastY;
+      for (const item of content.items) {
+        if (typeof item.str !== 'string') continue;
+        const y = item.transform?.[5];
+        if (line && Number.isFinite(y) && Number.isFinite(lastY) && Math.abs(y - lastY) > 2) {
+          lines.push(line); line = '';
+        }
+        line += (line ? ' ' : '') + item.str.trim();
+        lastY = y;
+        if (item.hasEOL) { lines.push(line); line = ''; }
+      }
+      if (line) lines.push(line);
+    }
+    return lines.join('\n');
+  } finally {
+    await document.destroy();
   }
+}
 
-  document.querySelector('#schedulePdfForm').reset();
+function scheduleImportRoster() {
+  return getRosterFromSchedule().filter((member) => !ops.inactiveStaff(member.name));
+}
+
+async function readScheduleImport() {
+  if (!canUseManagerTools()) return;
+  const file = document.querySelector('#schedulePdfInput').files[0];
+  if (!file) return importStatus('Choose a published PDF or CSV first.');
+  if (file.size > 10000000) return importStatus('This file exceeds 10 MB. Use a smaller export or paste the verified shifts.');
+  const isPdf = /\.pdf$/i.test(file.name) || file.type === 'application/pdf';
+  const token = ++importReadToken;
+  const rowsBox = document.querySelector('#scheduleImportRows');
+  const previousRows = rowsBox.value;
+  importDraft = null;
+  importStatus('Reading schedule…');
+  try {
+    const [source, dataUrl] = await Promise.all([
+      isPdf ? extractSchedulePdf(file).catch(() => '') : file.text(),
+      isPdf && file.size <= 2000000 ? readFileAsDataUrl(file).catch(() => '') : ''
+    ]);
+    if (token !== importReadToken) return;
+    importDraft = { file, isPdf, dataUrl, fileId: crypto.randomUUID() };
+    if (rowsBox.value !== previousRows) return importStatus('Kept the shifts you entered while the file was being read.');
+    if (!isPdf) {
+      rowsBox.value = source;
+      importStatus('CSV loaded. Review the rows and set the first date from the schedule, then apply this week.');
+      return;
+    }
+    const { rows } = ops.readShiftRows(source, scheduleImportRoster(), { strict: false });
+    if (rows.length) {
+      rowsBox.value = rows.map((row) => [row.date, row.name, row.start, row.end].join(', ')).join('\n');
+      importStatus('Found ' + rows.length + ' dated shift rows. Check every shift against the PDF before applying.');
+    } else {
+      importStatus('No reliable dated rows found. Grid and image PDFs may need a CSV export or verified shifts pasted below.');
+    }
+  } catch {
+    if (token === importReadToken) importStatus('Could not read this file. Try a CSV export or paste verified shift rows.');
+  }
+}
+
+function applyScheduleImport(event) {
+  event.preventDefault();
+  if (!canUseManagerTools()) return;
+  const start = document.querySelector('#scheduleImportStart').value;
+  if (!ops.validDate(start)) return importStatus('Enter the first date shown on the published week.');
+  const week = Number(document.querySelector('#schedulePdfWeek').value);
+  const end = ops.shiftDate(start, 6);
+  const startOther = state.scheduleWeeks.find((entry) => entry.week !== week)?.start;
+  if (startOther && Math.abs(Date.parse(startOther) - Date.parse(start)) < 7 * 86400000) {
+    return importStatus('This overlaps the other imported week. Select the correct week tab or check the first date.');
+  }
+  const { rows: allRows, problems } = ops.readShiftRows(document.querySelector('#scheduleImportRows').value, scheduleImportRoster());
+  const rows = allRows.filter((row) => row.date >= start && row.date <= end);
+  if (problems.length) return importStatus(problems.slice(0, 4).join(' '));
+  if (!rows.length) return importStatus('No verified shifts fall within this week. Check the first date or select the other week.');
+  const oldSchedule = state.schedule;
+  const oldWeeks = state.scheduleWeeks;
+  const oldPdfs = state.schedulePdfs;
+  const previousWeek = oldWeeks.find((entry) => entry.week === week);
+  if (previousWeek && !confirm('Replace the previously applied shifts for Week ' + (week + 1) + '?')) return;
+  const owner = document.querySelector('#schedulePdfOwner').value || getLeadershipOwner();
+  const notes = document.querySelector('#schedulePdfNotes').value.trim();
+  const selectedFile = document.querySelector('#schedulePdfInput').files[0];
+  if (selectedFile && selectedFile !== importDraft?.file) return importStatus('Read the selected file first, or clear it to use only the entered shifts.');
+  const file = importDraft?.file;
+  state.schedule = oldSchedule.filter((shift) => (shift.date < start || shift.date > end) && shift.importWeek !== week)
+    .concat(rows.map((shift) => ({ ...shift, importWeek: week })));
+  state.scheduleWeeks = oldWeeks.filter((entry) => entry.week !== week).concat({
+    id: 'week-' + week, week, start, source: file?.name || 'Verified shift rows'
+  });
+  if (file) {
+    const sharedFile = oldPdfs.find((pdf) => pdf.fileId === importDraft.fileId && pdf.dataUrl);
+    state.schedulePdfs = [{ id: crypto.randomUUID(), name: file.name, size: file.size, week, start, owner, notes,
+      createdAt: new Date().toISOString(), dataUrl: sharedFile ? '' : importDraft.dataUrl,
+      fileId: importDraft.fileId, referenceId: sharedFile?.id, referenceType: importDraft.isPdf ? 'PDF' : 'CSV' }, ...oldPdfs];
+  }
+  if (!saveState()) {
+    Object.assign(state, { schedule: oldSchedule, scheduleWeeks: oldWeeks, schedulePdfs: oldPdfs });
+    return importStatus('Not saved: device storage is full. Apply the shift rows without attaching the file.');
+  }
+  activeScheduleWeek = week;
+  if (allRows.length === rows.length) {
+    importDraft = null;
+    document.querySelector('#schedulePdfInput').value = '';
+    document.querySelector('#scheduleImportRows').value = '';
+  }
   render();
-  setView('schedule');
+  importStatus('Week ' + (week + 1) + ' updated with ' + rows.length + ' verified shifts.' +
+    (allRows.length > rows.length ? ' Other dates were left in the editor for the other week.' : ''));
 }
 
 function readFileAsDataUrl(file) {
@@ -1459,29 +1512,6 @@ function readFileAsDataUrl(file) {
     reader.onload = () => resolve(reader.result);
     reader.readAsDataURL(file);
   });
-}
-
-function readFileAsArrayBuffer(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = reject;
-    reader.onload = () => resolve(reader.result);
-    reader.readAsArrayBuffer(file);
-  });
-}
-
-async function extractLoosePdfText(file) {
-  try {
-    const buffer = await readFileAsArrayBuffer(file);
-    const text = new TextDecoder('latin1').decode(buffer);
-    const pieces = [...text.matchAll(/\(([^()]{3,120})\)/g)]
-      .map((match) => match[1])
-      .filter((value) => /[A-Za-z]/.test(value))
-      .slice(0, 80);
-    return [...new Set(pieces)].join(' ').replace(/\s+/g, ' ').trim().slice(0, 2000);
-  } catch {
-    return '';
-  }
 }
 
 function resizeImageFile(file) {
@@ -1509,6 +1539,7 @@ function resizeImageFile(file) {
 
 function render() {
   applyAccessControls();
+  document.querySelector('#enableAlerts').textContent = alertsEnabled ? 'Disable alerts' : 'Enable alerts';
   renderMetrics();
   renderTasks();
   renderInventory();
@@ -1522,6 +1553,7 @@ function render() {
   renderMessages();
   renderRoster();
   renderDailyBrief();
+  refreshOperations();
   populatePhotoOwners();
   populateSchedulePdfOwners();
 }
@@ -1560,118 +1592,250 @@ function renderMetrics() {
 
 function renderTasks() {
   const visibleTasks = getVisibleTasks();
+  const board = document.querySelector('#taskBoard');
+  const scroll = board.scrollLeft;
   const sorted = [...visibleTasks].sort((a, b) => {
     const priorityScore = { high: 0, medium: 1, low: 2 };
     return priorityScore[a.priority] - priorityScore[b.priority] || a.due.localeCompare(b.due);
   });
 
-  const filtered = activeFilter === 'all' ? sorted : sorted.filter((task) => task.category === activeFilter);
-  document.querySelector('#taskBoard').innerHTML = filtered.length
+  const filtered = activeFilter === 'completed' ? sorted.filter((task) => task.done) :
+    sorted.filter((task) => !task.done && (activeFilter === 'all' || task.category === activeFilter));
+  board.innerHTML = filtered.length
     ? filtered.map(taskTemplate).join('')
     : `<div class="empty-state">${isAssociateAccess() ? 'No tasks assigned to this team member yet.' : 'No tasks match this filter.'}</div>`;
+  board.scrollLeft = scroll;
   document.querySelector('#priorityTaskList').innerHTML = sorted.filter((task) => !task.done).slice(0, 4).map(taskTemplate).join('');
   bindTaskControls(document.querySelector('#tasksView'));
   bindTaskControls(document.querySelector('#dashboardView'));
 }
 
 function bindTaskControls(scope) {
-  scope.querySelectorAll('[data-task-toggle]').forEach((checkbox) => {
-    checkbox.addEventListener('change', () => {
-      const task = state.tasks.find((item) => item.id === checkbox.dataset.taskToggle);
-      task.done = checkbox.checked;
-      if (task.done && state.activeTimer?.taskId === task.id) {
-        stopTimer();
-      }
+  scope.querySelectorAll('[data-task-toggle]').forEach((button) => {
+    button.addEventListener('click', () => setTaskCompleted(button.dataset.taskToggle));
+  });
+  scope.querySelectorAll('[data-timer-task]').forEach((button) => {
+    button.addEventListener('click', () => toggleTaskTimer(button.dataset.timerTask));
+  });
+  scope.querySelectorAll('[data-reassign-task]').forEach((select) => {
+    select.addEventListener('change', () => {
+      const task = state.tasks.find((item) => item.id === select.dataset.reassignTask);
+      if (!task || !canUseManagerTools() || !select.value) return;
+      task.owner = select.value;
       saveState();
       render();
     });
   });
-
-  scope.querySelectorAll('[data-start-timer]').forEach((button) => {
-    button.addEventListener('click', () => startTimer(button.dataset.startTimer));
-  });
-
-  scope.querySelectorAll('[data-stop-timer]').forEach((button) => {
-    button.addEventListener('click', stopTimer);
-  });
-
   scope.querySelectorAll('[data-add-time]').forEach((button) => {
-    button.addEventListener('click', () => addManualTime(button.dataset.addTime, 15));
+    button.addEventListener('click', () => addManualTime(button.dataset.addTime));
   });
+}
+
+function setTaskCompleted(id) {
+  const task = state.tasks.find((item) => item.id === id);
+  if (!task || !canWorkTask(task)) return;
+  task.done = !task.done;
+  if (task.done && state.activeTimer?.taskId === id) finishTaskTimer('finished');
+  saveState();
+  render();
 }
 
 function taskTemplate(task) {
   const photo = findPhoto(task.photoId);
-  const minutes = getTaskMinutes(task.id);
-  const isActive = state.activeTimer?.taskId === task.id;
+  const timer = state.activeTimer?.taskId === task.id ? state.activeTimer : null;
+  const label = timer ? (timer.startedAt ? 'Pause' : 'Resume') : 'Start';
   const ownerRole = getRoleForName(task.owner);
+  const reassign = !task.done && canUseManagerTools() && ops.inactiveStaff(task.owner)
+    ? `<label>Reassign from former staff <select data-reassign-task="${escapeHtml(task.id)}"><option value="">Choose owner</option>${state.team
+      .map((person) => `<option value="${escapeHtml(person.name)}">${escapeHtml(person.name)}</option>`).join('')}</select></label>` : '';
   return `
     <article class="task-card ${task.done ? 'done' : ''}">
-      <input type="checkbox" ${task.done ? 'checked' : ''} data-task-toggle="${task.id}" aria-label="Complete ${escapeHtml(task.title)}">
       <div>
         <p class="task-title">${escapeHtml(task.title)}</p>
-        <div class="task-meta">${capitalize(task.category)} - ${escapeHtml(task.owner)}${ownerRole ? ` - ${escapeHtml(ownerRole)}` : ''} - due ${formatDue(task.due)}</div>
+        <div class="task-meta">${escapeHtml(capitalize(task.category))} - ${escapeHtml(task.owner)}${ownerRole ? ` - ${escapeHtml(ownerRole)}` : ''} - due ${formatDue(task.due)} ${escapeHtml(task.dueTime || '')}</div>
         <div class="subtle">${escapeHtml(task.notes || 'No notes added.')}</div>
         ${photo ? photoThumb(photo) : ''}
+        ${reassign}
         <div class="task-actions">
-          <span class="time-chip">${formatMinutes(minutes)} logged</span>
-          ${
-            isActive
-              ? `<button class="secondary-button small-button" data-stop-timer="${task.id}" type="button">Stop</button>`
-              : `<button class="secondary-button small-button" data-start-timer="${task.id}" type="button">Start</button>`
-          }
-          <button class="secondary-button small-button" data-add-time="${task.id}" type="button">+15 min</button>
+          <span class="time-chip"${timer ? ' data-running-clock' : ''}>${timer ? timerLabel(timer) : formatMinutes(getTaskMinutes(task.id)) + ' logged'}</span>
+          ${task.done ? '' : `<button class="secondary-button small-button" data-timer-task="${escapeHtml(task.id)}" type="button">${label}</button>`}
+          <button class="secondary-button small-button" data-task-toggle="${escapeHtml(task.id)}" type="button">${task.done ? 'Reopen' : 'Complete'}</button>
+          ${canUseManagerTools() ? `<button class="text-button small-button" data-add-time="${escapeHtml(task.id)}" type="button">Adjust time</button>` : ''}
         </div>
       </div>
-      <span class="badge ${task.priority}">${capitalize(task.priority)}</span>
+      <span class="badge ${escapeHtml(task.priority)}">${escapeHtml(capitalize(task.priority))}</span>
     </article>
   `;
 }
 
-function startTimer(taskId) {
-  if (state.activeTimer?.taskId === taskId) return;
-  if (state.activeTimer) stopTimer();
-  state.activeTimer = {
-    taskId,
-    startedAt: new Date().toISOString()
-  };
+function timerLabel(timer) {
+  const seconds = Math.floor(ops.timerElapsed(timer) / 1000);
+  return Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0') + (timer.startedAt ? ' running' : ' paused');
+}
+
+function toggleTaskTimer(id) {
+  const task = state.tasks.find((item) => item.id === id);
+  if (!task || task.done || !canWorkTask(task)) return;
+  const timer = state.activeTimer;
+  if (timer?.taskId === id && timer.startedAt) {
+    pauseTaskTimer('paused');
+  } else {
+    if (timer && timer.taskId !== id) finishTaskTimer('changed task');
+    state.activeTimer = { id: crypto.randomUUID(), ...state.activeTimer, taskId: id, startedAt: new Date().toISOString(), elapsedMs: state.activeTimer?.elapsedMs || 0 };
+  }
   saveState();
   render();
 }
 
-function stopTimer() {
-  if (!state.activeTimer) return;
-  const task = state.tasks.find((item) => item.id === state.activeTimer.taskId);
-  const started = new Date(state.activeTimer.startedAt);
-  const minutes = Math.max(1, Math.round((Date.now() - started.getTime()) / 60000));
-  state.timeEntries.unshift({
-    id: crypto.randomUUID(),
-    taskId: state.activeTimer.taskId,
-    taskTitle: task?.title || 'Unknown task',
-    owner: task?.owner || 'Unassigned',
-    category: task?.category || 'general',
-    minutes,
-    createdAt: new Date().toISOString()
+function pauseTaskTimer(reason) {
+  if (!state.activeTimer?.startedAt) return;
+  state.activeTimer.elapsedMs = ops.timerElapsed(state.activeTimer);
+  state.activeTimer.startedAt = null;
+  state.activeTimer.reason = reason;
+}
+
+function finishTaskTimer(reason) {
+  const timer = state.activeTimer;
+  if (!timer) return;
+  const task = state.tasks.find((item) => item.id === timer.taskId);
+  const seconds = Math.floor(ops.timerElapsed(timer) / 1000);
+  if (seconds > 0) state.timeEntries.unshift({
+    id: crypto.randomUUID(), taskId: timer.taskId, taskTitle: task?.title || 'Unknown task',
+    owner: task?.owner || 'Unassigned', category: task?.category || 'general',
+    minutes: seconds / 60, reason: timer.reason ? reason + ' · ' + timer.reason : reason, createdAt: new Date().toISOString()
   });
   state.activeTimer = null;
+}
+
+function addManualTime(taskId) {
+  const task = state.tasks.find((item) => item.id === taskId);
+  if (!task || !canUseManagerTools()) return;
+  const raw = prompt('Minutes to add or subtract for ' + task.owner + ':');
+  if (raw === null) return;
+  const minutes = Number(raw);
+  if (!Number.isInteger(minutes) || minutes === 0 || Math.abs(minutes) > 480 || getTaskMinutes(taskId) + minutes < 0) {
+    return alert('Enter whole minutes between -480 and 480 without making the task time negative.');
+  }
+  const reason = prompt('Reason for the time adjustment:')?.trim();
+  if (!reason) return;
+  state.timeEntries.unshift({
+    id: crypto.randomUUID(), taskId, taskTitle: task.title, owner: task.owner, category: task.category,
+    minutes, reason, createdAt: new Date().toISOString()
+  });
   saveState();
   render();
 }
 
-function addManualTime(taskId, minutes) {
-  const task = state.tasks.find((item) => item.id === taskId);
-  if (!task) return;
-  state.timeEntries.unshift({
-    id: crypto.randomUUID(),
-    taskId,
-    taskTitle: task.title,
-    owner: task.owner,
-    category: task.category,
-    minutes,
-    createdAt: new Date().toISOString()
-  });
+function handleWorkVisibility() {
+  if (document.visibilityState === 'hidden') {
+    hiddenSince = Date.now();
+    return;
+  }
+  const timer = state.activeTimer;
+  const dialog = document.querySelector('#workCheckDialog');
+  if (timer?.startedAt && hiddenSince && Date.now() - Math.max(hiddenSince, Date.parse(timer.startedAt)) >= 15 * 60000 && !dialog.open) {
+    checkTaskId = timer.taskId;
+    dialog.returnValue = '';
+    dialog.showModal();
+  }
+  hiddenSince = 0;
+  refreshOperations();
+}
+
+function handleWorkCheck(event) {
+  const action = event.target.returnValue;
+  if (state.activeTimer?.taskId !== checkTaskId) return;
+  if (action === 'finished') return setTaskCompleted(checkTaskId);
+  if (action === 'changed') finishTaskTimer('changed task');
+  else if (action === 'break' || action === 'interrupted') pauseTaskTimer(action);
+  else if (!action) {
+    pauseTaskTimer('Follow-up Opportunity: work context not confirmed');
+    postOperationsAlert('Follow-up Opportunity', 'Timer paused until the work context is confirmed.', false);
+  } else return;
   saveState();
   render();
+}
+
+function unlockAlertAudio() {
+  if (!alertsEnabled) return;
+  const Context = window.AudioContext || window.webkitAudioContext;
+  if (!Context) return;
+  try {
+    alertAudio ||= new Context();
+    if (alertAudio.state === 'suspended') alertAudio.resume().catch(() => {});
+  } catch {}
+}
+
+function playAlertSound() {
+  if (alertAudio?.state !== 'running') return;
+  const oscillator = alertAudio.createOscillator();
+  const gain = alertAudio.createGain();
+  const now = alertAudio.currentTime;
+  oscillator.frequency.value = 660;
+  gain.gain.setValueAtTime(0.08, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+  oscillator.connect(gain).connect(alertAudio.destination);
+  oscillator.start(now);
+  oscillator.stop(now + 0.4);
+}
+
+function postOperationsAlert(title, detail, notify = true) {
+  const banner = document.querySelector('#operationsAlert');
+  banner.textContent = title + ': ' + detail;
+  banner.hidden = false;
+  window.clearTimeout(dismissedAlertTimer);
+  dismissedAlertTimer = window.setTimeout(() => { banner.hidden = true; }, 18000);
+  if (notify) playAlertSound();
+  if (notify && window.Notification?.permission === 'granted' && navigator.serviceWorker) {
+    navigator.serviceWorker.getRegistration().then((registration) =>
+      registration?.showNotification('StoreFlow', { body: title, tag: 'storeflow-operations' })
+    ).catch(() => {});
+  }
+}
+
+async function toggleOperationsAlerts() {
+  alertsEnabled = !alertsEnabled;
+  localStorage.setItem(alertSettingsKey, alertsEnabled ? 'on' : 'off');
+  document.querySelector('#enableAlerts').textContent = alertsEnabled ? 'Disable alerts' : 'Enable alerts';
+  if (!alertsEnabled) return postOperationsAlert('Alerts off', 'Due and timer alerts are off on this device.', false);
+  unlockAlertAudio();
+  if (window.Notification?.permission === 'default') {
+    try { await window.Notification.requestPermission(); } catch {}
+  }
+  postOperationsAlert('Alerts on', 'StoreFlow checks due work and timer alarms while open.', false);
+  refreshOperations();
+}
+
+function refreshOperations() {
+  const timer = state.activeTimer;
+  document.querySelectorAll('[data-running-clock]').forEach((clock) => {
+    if (timer) clock.textContent = timerLabel(timer);
+  });
+  const now = new Date();
+  const date = ops.dateKey(now);
+  const phase = ops.recoveryAt(now);
+  const recovery = document.querySelector('#recoveryPhase');
+  if (recovery) recovery.textContent = phase.join(' — ');
+  if (!alertsEnabled) return;
+  const ring = (id, title, detail) => {
+    if (firedAlerts.has(id)) return;
+    firedAlerts.add(id);
+    postOperationsAlert(title, detail);
+  };
+  for (const task of getVisibleTasks()) {
+    if (task.done) continue;
+    if (task.id === timer?.taskId && task.alarmMinutes > 0 && ops.timerElapsed(timer) >= task.alarmMinutes * 60000) {
+      ring('timer:' + (timer.id || task.id), 'Task timer', task.title + ' reached ' + task.alarmMinutes + ' minutes.');
+    }
+    if (task.due === date && task.dueTime && Date.parse(date + 'T' + task.dueTime) <= now.getTime()) {
+      ring('due:' + task.id + ':' + date, 'Task due', task.title);
+    }
+  }
+  for (const reminder of state.reminders) {
+    if (!reminder.done && reminder.due === date && (!isAssociateAccess() || reminder.owner === currentAccess.member)) {
+      ring('reminder:' + reminder.id + ':' + date, 'Reminder due', reminder.title);
+    }
+  }
 }
 
 function renderSuggestions() {
@@ -1695,7 +1859,7 @@ function renderSuggestions() {
       : 'Ask each shift lead for one blocker before shift change and turn it into a task.',
     eventTasks.length
       ? `${event.name} is ${getDaysUntilEvent(event)} days away. Put tracked time on "${eventTasks[0].title}" today.`
-      : 'Use +15 min logs on prep work so you can see where productive time is going.',
+      : 'Start a task timer when prep work begins so the next shift can see the time logged.',
     `Today is ${todayWorkflow.day} ${todayWorkflow.code}: ${todayWorkflow.workflow}`
   ];
 
@@ -2038,7 +2202,7 @@ function buildRoutineChecks() {
 
 function getTodayShifts() {
   return state.schedule
-    .filter((shift) => shift.date === isoToday)
+    .filter((shift) => shift.date === isoToday && !ops.inactiveStaff(shift.name))
     .sort((a, b) => a.start.localeCompare(b.start));
 }
 
@@ -2071,8 +2235,8 @@ function renderInventory() {
   document.querySelector('#eventDateInput').value = event.date;
   document.querySelector('#eventFocusInput').value = event.focus;
 
-  const eventTasks = getEventTasks(event)
-    .sort((a, b) => Number(a.done) - Number(b.done) || a.due.localeCompare(b.due));
+  const eventTasks = getEventTasks(event).filter((task) => !task.done)
+    .sort((a, b) => a.due.localeCompare(b.due));
   const openEventTasks = eventTasks.filter((task) => !task.done).length;
   const dueReminders = state.reminders.filter((reminder) => isCurrentEventItem(reminder, event) && reminder.due <= isoToday && !reminder.done).length;
 
@@ -2129,7 +2293,7 @@ function renderTimeSummary() {
   document.querySelector('#timeSummary').innerHTML = `
     <div class="time-stat"><span>Total logged</span><strong>${formatMinutes(getTotalMinutes())}</strong></div>
     <div class="time-stat"><span>Event prep</span><strong>${formatMinutes(categoryTotals.inventory || 0)}</strong></div>
-    <div class="time-stat"><span>Active timer</span><strong>${state.activeTimer ? 'Running' : 'None'}</strong></div>
+    <div class="time-stat"><span>Active timer</span><strong>${state.activeTimer ? (state.activeTimer.startedAt ? 'Running' : 'Paused') : 'None'}</strong></div>
     <div class="time-breakdown">
       <strong>By category</strong>
       ${topCategories.map(([label, minutes]) => `<p>${escapeHtml(capitalize(label))}: ${formatMinutes(minutes)}</p>`).join('') || '<p>No time logged yet.</p>'}
@@ -2187,34 +2351,39 @@ function renderPhotos() {
 
 function renderSchedulePdfs() {
   const container = document.querySelector('#schedulePdfList');
-  if (!state.schedulePdfs.length) {
-    container.innerHTML = '<div class="empty-state">Upload the published schedule PDF from email. It will be saved here as the schedule reference for review.</div>';
+  const references = state.schedulePdfs.filter((pdf) => pdf.week === activeScheduleWeek);
+  if (!references.length) {
+    container.innerHTML = '<div class="empty-state">No schedule references for this week.</div>';
     return;
   }
 
-  container.innerHTML = state.schedulePdfs
-    .map((pdf) => `
+  container.innerHTML = references
+    .map((pdf) => {
+      const dataUrl = pdf.dataUrl || state.schedulePdfs.find((source) => source.id === pdf.referenceId)?.dataUrl;
+      const safePdf = /^data:application\/pdf;base64,[\w+/=]+$/.test(dataUrl || '') ? dataUrl : '';
+      return `
       <article class="schedule-pdf-card">
         <div class="pdf-title">
           <div>
             <strong>${escapeHtml(pdf.name)}</strong>
             <div class="task-meta">Week ${pdf.week + 1} · ${escapeHtml(pdf.owner)} · ${formatFileSize(pdf.size)}</div>
           </div>
-          <span class="badge ${pdf.dataUrl ? 'low' : 'medium'}">${pdf.dataUrl ? 'Saved' : 'Too large'}</span>
+          <span class="badge ${safePdf ? 'low' : 'medium'}">${safePdf ? 'Saved' : 'Reference details'}</span>
         </div>
         <p class="subtle">${escapeHtml(pdf.notes)}</p>
         ${
-          pdf.dataUrl
-            ? `<object class="pdf-preview" data="${pdf.dataUrl}" type="application/pdf"><a href="${pdf.dataUrl}" download="${escapeHtml(pdf.name)}">Open PDF</a></object>`
-            : '<div class="empty-state small-empty">This PDF was too large for browser storage. Keep the email copy and use this card as the review task reference.</div>'
+          safePdf
+            ? `<object class="pdf-preview" data="${safePdf}" type="application/pdf"><a href="${safePdf}" download="${escapeHtml(pdf.name)}">Open PDF</a></object>`
+            : '<div class="empty-state small-empty">Keep the original file for reference.</div>'
         }
         ${
           pdf.extractedText
             ? `<details class="pdf-text"><summary>Possible extracted text</summary><p>${escapeHtml(pdf.extractedText)}</p></details>`
-            : '<p class="form-hint">No readable text was found in the raw PDF. This usually means the PDF is compressed or image-based.</p>'
+            : ''
         }
       </article>
-    `)
+    `;
+    })
     .join('');
 }
 
@@ -2278,7 +2447,7 @@ function getTaskMinutes(taskId) {
     .filter((entry) => entry.taskId === taskId)
     .reduce((sum, entry) => sum + entry.minutes, 0);
   if (state.activeTimer?.taskId !== taskId) return logged;
-  const running = Math.max(0, Math.floor((Date.now() - new Date(state.activeTimer.startedAt).getTime()) / 60000));
+  const running = ops.timerElapsed(state.activeTimer) / 60000;
   return logged + running;
 }
 
@@ -2295,6 +2464,7 @@ function getMinutesBy(field) {
 }
 
 function formatMinutes(minutes) {
+  minutes = Math.max(0, Math.floor(minutes || 0));
   if (!minutes) return '0m';
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
@@ -2356,6 +2526,12 @@ function renderSchedule() {
   });
 
   const weekDates = getScheduleWeekDates(activeScheduleWeek);
+  const imported = state.scheduleWeeks.find((entry) => entry.week === activeScheduleWeek);
+  const source = document.querySelector('#scheduleWeekSource');
+  if (source) source.textContent = imported ? 'Published source: ' + imported.source : 'No published schedule has been applied for this week.';
+  const select = document.querySelector('#schedulePdfWeek');
+  select.value = String(activeScheduleWeek);
+  if (!document.querySelector('#scheduleImportStart').value) document.querySelector('#scheduleImportStart').value = weekDates[0];
   const weekShifts = state.schedule.filter((shift) => weekDates.includes(shift.date));
   const totalHours = weekShifts.reduce((sum, shift) => sum + getShiftHours(shift), 0);
   const people = new Set(weekShifts.map((shift) => shift.name)).size;
@@ -2391,9 +2567,7 @@ function renderSchedule() {
     })
     .join('');
 
-  const todayShifts = state.schedule
-    .filter((shift) => shift.date === isoToday)
-    .sort((a, b) => a.start.localeCompare(b.start));
+  const todayShifts = getTodayShifts();
 
   document.querySelector('#scheduleList').innerHTML = todayShifts.length
     ? todayShifts.map((shift) => `
@@ -2408,7 +2582,7 @@ function renderSchedule() {
       `).join('')
     : '<div class="empty-state">No shifts are scheduled for today.</div>';
 
-  const todayDirection = state.schedule.filter((shift) => shift.date === isoToday);
+  const todayDirection = todayShifts;
   document.querySelector('#positionList').innerHTML = todayDirection.length
     ? todayDirection
     .map((shift) => `
@@ -2441,7 +2615,8 @@ function scheduleShiftTemplate(shift) {
 }
 
 function getScheduleWeekDates(offset) {
-  return Array.from({ length: 7 }, (_, index) => addDaysToDate(scheduleStartDate, offset * 7 + index));
+  const start = ops.scheduleWeekStarts(state.scheduleWeeks, ops.dateKey())[offset];
+  return Array.from({ length: 7 }, (_, index) => ops.shiftDate(start, index));
 }
 
 function getShiftHours(shift) {
@@ -2586,9 +2761,13 @@ function getRosterFromSchedule() {
   const upcoming = state.schedule
     .filter((shift) => shift.date >= isoToday)
     .sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start));
-  const rosterMap = new Map();
+  const rosterMap = new Map(state.team.map((person) => [person.name, {
+    name: person.name, role: person.role, initials: getInitials(person.name),
+    shiftCount: 0, hours: 0, worksToday: false, nextShift: null
+  }]));
 
   state.schedule.forEach((shift) => {
+    if (ops.inactiveStaff(shift.name)) return;
     const existing = rosterMap.get(shift.name);
     const base = teamByName.get(shift.name);
     const nextShift = upcoming.find((item) => item.name === shift.name) || null;
@@ -2602,7 +2781,7 @@ function getRosterFromSchedule() {
       nextShift
     };
 
-    current.role = getPrimaryRole(current.role, shift.position);
+    current.role = base?.role || getPrimaryRole(current.role, shift.position);
     current.shiftCount += 1;
     current.hours += getShiftHours(shift);
     current.worksToday = current.worksToday || shift.date === isoToday;
