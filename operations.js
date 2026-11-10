@@ -33,6 +33,7 @@
 
   function staffName(name) {
     const clean = String(name || '').trim();
+    if (/^(?:sarah|sanah)(?:\s+i\.?)?$/i.test(clean)) return 'Sanah I.';
     if (/^(marge|margaret|margarette)(?:\s|$)/i.test(clean)) return 'Margarette L.';
     if (/^(nate|nathan)(?:\s|$)/i.test(clean)) return 'Nathan H.';
     if (/^dominic(?:\s|$)/i.test(clean)) return 'Dominic S.';
