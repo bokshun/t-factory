@@ -8,8 +8,8 @@
     <meta name="apple-mobile-web-app-title" content="StoreFlow" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>DG StoreFlow</title>
-    <link rel="manifest" href="manifest.webmanifest?v=20260702-3" />
-    <link rel="stylesheet" href="styles.css?v=20260702-3" />
+    <link rel="manifest" href="manifest.webmanifest?v=20261112-1" />
+    <link rel="stylesheet" href="styles.css?v=20261112-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -72,6 +72,7 @@
             <button class="primary-button" id="openTaskModal" type="button">New Task</button>
           </div>
         </header>
+        <p class="board-hint">Swipe left or right through boards and cards. Use arrow keys when a lane is focused.</p>
         <p id="operationsAlert" class="operations-alert" role="status" hidden></p>
 
         <section class="view active" id="dashboardView" aria-labelledby="pageTitle">
@@ -512,8 +513,9 @@
       </form>
     </dialog>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="operations.js?v=20261109-1"></script>
-    <script src="sync-core.js?v=20261109-1"></script>
-    <script src="app.js?v=20261109-1"></script>
+    <script src="board-layout.js?v=20261112-1"></script>
+    <script src="operations.js?v=20261112-1"></script>
+    <script src="sync-core.js?v=20261112-1"></script>
+    <script src="app.js?v=20261112-1"></script>
   </body>
 </html>
