@@ -8,8 +8,9 @@
     <meta name="apple-mobile-web-app-title" content="StoreFlow" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>DG StoreFlow</title>
-    <link rel="manifest" href="manifest.webmanifest?v=20261112-1" />
-    <link rel="stylesheet" href="styles.css?v=20261112-1" />
+    <link rel="manifest" href="manifest.webmanifest?v=20261112-2" />
+    <link rel="stylesheet" href="styles.css?v=20261112-2" />
+  <link rel="stylesheet" href="planner.css?v=20261112-2" />
   </head>
   <body>
     <div class="app-shell">
@@ -23,6 +24,7 @@
         </div>
 
         <nav class="nav-list">
+          <button class="nav-item" data-view="planner" type="button">Daily Planner</button>
           <button class="nav-item active" data-view="dashboard" type="button">
             <span class="icon" aria-hidden="true">◎</span>
             Dashboard
@@ -131,6 +133,7 @@
           </div>
         </section>
 
+        <section class="view" id="plannerView"></section>
         <section class="view" id="tasksView">
           <div class="filters">
             <button class="filter-chip active" data-filter="all" type="button">Open</button>
@@ -513,9 +516,12 @@
       </form>
     </dialog>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="board-layout.js?v=20261112-1"></script>
-    <script src="operations.js?v=20261112-1"></script>
-    <script src="sync-core.js?v=20261112-1"></script>
-    <script src="app.js?v=20261112-1"></script>
+    <div id="cleaningPaper" class="cleaning-paper"></div>
+    <script src="board-layout.js?v=20261112-2"></script>
+    <script src="planner-core.js?v=20261112-2"></script>
+    <script src="operations.js?v=20261112-2"></script>
+    <script src="sync-core.js?v=20261112-2"></script>
+    <script src="app.js?v=20261112-2"></script>
+    <script src="planner-ui.js?v=20261112-2"></script>
   </body>
 </html>

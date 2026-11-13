@@ -1,7 +1,7 @@
 const storageKey = 'dg-storeflow-state-v1';
 const syncConfigKey = 'dg-storeflow-sync-config-v1';
 const accessProfileKey = 'dg-storeflow-access-profile-v1';
-const appVersion = '2026.11.12.1';
+const appVersion = '2026.11.12.2';
 const ops = window.StoreFlowOperations;
 const alertSettingsKey = 'dg-storeflow-operations-alerts-v1';
 let alertsEnabled = localStorage.getItem(alertSettingsKey) === 'on';
@@ -39,81 +39,9 @@ const defaultPlanningEvent = {
   focus: 'clearance'
 };
 
-const sevenDayWorkflow = [
-  {
-    day: 'Saturday',
-    code: 'T+1',
-    weekly: 'Hang ad signs at 7:00 p.m.',
-    workflow: 'Stock truck core',
-    freshTruck: 'P+4: Fill in overstock using FIFO. Ensure MAG is correct for remaining overstock. Check OHA of 3 items or less and PIA of milk/egg items.',
-    nightly: 'Recovery'
-  },
-  {
-    day: 'Sunday',
-    code: 'T+2',
-    weekly: '',
-    workflow: 'Finish truck core',
-    freshTruck: '',
-    nightly: 'Recovery'
-  },
-  {
-    day: 'Monday',
-    code: 'T+3',
-    weekly: 'Complete fresh damages/rotation and complete DG Connect.',
-    workflow: 'Set and fill Seasonal G Sections. Set and fill MAG endcaps.',
-    freshTruck: '',
-    nightly: 'Recovery'
-  },
-  {
-    day: 'Tuesday',
-    code: 'T+4 / P-Day',
-    weekly: 'Complete Compliance Tuesday.',
-    workflow: 'Set POG sky shelves.',
-    freshTruck: 'Prep deep recovery. Fill overstock using FIFO. Clean and sanitize coolers. Receive truck. Rotate nones as they arrive by priority: ice cream, milk, refrigerated, frozen.',
-    nightly: 'Recovery'
-  },
-  {
-    day: 'Wednesday',
-    code: 'T+5',
-    weekly: '',
-    workflow: 'Backstock',
-    freshTruck: '',
-    nightly: 'Recovery'
-  },
-  {
-    day: 'Thursday',
-    code: 'T+6',
-    weekly: 'Complete fresh damages/rotation.',
-    workflow: 'Organize RR nones and tons. Complete dry damages.',
-    freshTruck: '',
-    nightly: 'Recovery'
-  },
-  {
-    day: 'Friday',
-    code: 'T-Day',
-    weekly: '',
-    workflow: 'Plan stocking. Receive truck. Stock toppers and totes.',
-    freshTruck: '',
-    nightly: 'Recovery'
-  }
-];
-
-const complianceTuesdayTasks = [
-  'Price changes: install core price change labels and hang clearance stickers.',
-  'Complete nones and tons routine from the Store Business Center.',
-  'Prioritize OTC sections.',
-  'Product Rotation Alerts in HHT.',
-  'Store Safety Walk: confirm register flash, fire extinguisher, and electrical panels are clear, unobstructed, and accessible.'
-];
-
-const dailyActivities = [
-  'Complete all Daily Planner tasks for Front End, Receiving Room, and Sales Floor.',
-  'Restock and rotate perishables.',
-  'Fill Balance Impulse area by 9:00 a.m.',
-  'Recover and clean first 30 feet all day.',
-  'Deep recovery and stock FHB.',
-  'Daily recovery from 5:00 p.m. to close for full store.'
-];
+const sevenDayWorkflow = window.StoreFlowPlanner.workflow;
+const complianceTuesdayTasks = window.StoreFlowPlanner.compliance;
+const dailyActivities = window.StoreFlowPlanner.daily;
 
 const companyStandards = [
   {
@@ -285,7 +213,7 @@ const sampleState = {
       priority: 'medium',
       owner: 'Carlton R.',
       due: addDays(1),
-      notes: 'Tuesday T+4 workflow: set POG sky shelves and confirm labels.',
+      notes: 'Monday T+4 workflow: set POG sky shelves and confirm labels.',
       done: false
     },
     {
@@ -333,7 +261,7 @@ const sampleState = {
   schedulePdfs: [],
   scheduleWeeks: [],
   compassNotes: [
-    { id: 'c1', title: '7-day setup', body: 'T-Day is Friday. P-Day is Tuesday. Pre-open stocking is yes. Dedicated delivery store is no.' },
+    { id: 'c1', title: '7-day setup', body: 'T-Day is Thursday. Outs/Nones & Tons are Wednesday (T+6). P-Days are Tuesday and Friday. Pre-open stocking is yes. Dedicated delivery store is no.' },
     { id: 'c2', title: 'Daily reminder', body: 'Assign one owner per workflow task and check progress before shift change.' }
   ],
   messages: [
@@ -358,6 +286,7 @@ let activeScheduleWeek = getCurrentScheduleWeek();
 let currentAccess = loadAccessProfile();
 
 const views = {
+  planner: document.querySelector('#plannerView'),
   dashboard: document.querySelector('#dashboardView'),
   tasks: document.querySelector('#tasksView'),
   inventory: document.querySelector('#inventoryView'),
@@ -368,6 +297,7 @@ const views = {
 };
 
 const pageTitles = {
+  planner: 'Daily Planner and Cleaning',
   dashboard: 'Daily Command Center',
   tasks: 'Task Board',
   inventory: 'Event Planner',
@@ -465,6 +395,7 @@ function normalizeState(savedState) {
     ...structuredClone(sampleState),
     ...savedState,
     team: sampleState.team,
+    dailyPlans: Array.isArray(savedState.dailyPlans) ? savedState.dailyPlans : [],
     tasks: savedState.tasks || sampleState.tasks,
     schedule: normalizeSchedule(savedState.schedule || sampleState.schedule),
     schedulePdfs: savedState.schedulePdfs || [],
@@ -478,6 +409,8 @@ function normalizeState(savedState) {
     timeEntries: savedState.timeEntries || [],
     activeTimer: savedState.activeTimer || null
   };
+  const setup = merged.compassNotes.find(n => n.id === 'c1');
+  if (setup?.body === 'T-Day is Friday. P-Day is Tuesday. Pre-open stocking is yes. Dedicated delivery store is no.') setup.body = sampleState.compassNotes[0].body;
   migratePlaceholderNames(merged);
   return merged;
 }
@@ -609,8 +542,8 @@ function isAssociateAccess() {
 }
 
 function getAllowedViews() {
-  if (isManagerAccess()) return ['dashboard', 'tasks', 'inventory', 'schedule', 'compass', 'photos', 'team'];
-  if (isKeyholderAccess()) return ['dashboard', 'tasks', 'schedule', 'compass', 'team'];
+  if (isManagerAccess()) return ['dashboard', 'planner', 'tasks', 'inventory', 'schedule', 'compass', 'photos', 'team'];
+  if (isKeyholderAccess()) return ['dashboard', 'planner', 'tasks', 'schedule', 'compass', 'team'];
   return ['tasks', 'team'];
 }
 
@@ -624,7 +557,7 @@ function canWorkTask(task) {
 }
 
 function getVisibleTasks(tasks = state.tasks) {
-  return tasks.filter(canWorkTask);
+  return tasks.filter(task => !task.plannerExcluded && !window.StoreFlowPlanner.isDriveline(task)).filter(canWorkTask);
 }
 
 function getAccessLabel() {
@@ -722,7 +655,7 @@ function clearOldAppCaches() {
     .then((keys) =>
       Promise.all(
         keys
-          .filter((key) => key.startsWith('dg-storeflow-') && key !== 'dg-storeflow-v14')
+          .filter((key) => key.startsWith('dg-storeflow-') && key !== 'dg-storeflow-v16')
           .map((key) => caches.delete(key))
       )
     )
@@ -1558,6 +1491,7 @@ function render() {
   renderMessages();
   renderRoster();
   renderDailyBrief();
+  if (typeof window.renderDailyPlanner === 'function') window.renderDailyPlanner();
   refreshOperations();
   populatePhotoOwners();
   populateSchedulePdfOwners();
