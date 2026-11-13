@@ -1199,3 +1199,65 @@ menu {
   border-radius: .5rem;
   background: #fff5d5;
 }
+
+/* Every view uses horizontal lanes; the document stays within the screen. */
+html, body { height: 100%; overflow: hidden; }
+.app-shell { height: 100vh; height: 100dvh; min-height: 0; }
+.sidebar { min-height: 0; overflow: auto; }
+.main { min-height: 0; display: flex; flex-direction: column; gap: 12px; }
+.topbar { flex: 0 0 auto; margin: 0; }
+.board-hint { margin: 0; font-size: 12px; color: var(--muted); }
+.view.active { display: flex; flex: 1; min-height: 0; gap: 16px; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x proximity; padding-bottom: 12px; }
+.hero-panel, .content-grid, .schedule-layout, .compass-layout,
+.team-layout, .photo-layout, .inventory-layout, .metric-grid { display: contents; }
+.view.active > *, .view.active .panel, .hero-copy, .store-visual,
+.view.active .metric { flex: 0 0 min(86vw, 400px); min-width: 0; max-height: 100%; scroll-snap-align: start; }
+.panel { display: flex; flex-direction: column; gap: 8px; padding: 14px; }
+.panel-heading { flex: 0 0 auto; margin: 0; flex-wrap: wrap; }
+.panel-track { display: flex; flex: 1; min-height: 0; gap: 14px; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x proximity; padding-bottom: 8px; }
+.panel-track > * { flex: 0 0 100%; min-width: 0; max-height: 100%; overflow: auto; scroll-snap-align: start; margin: 0; }
+.panel-track > .is-hidden, .panel-track > [hidden] { display: none; }
+.task-list, .task-board, .suggestion-list, .schedule-list, .position-list,
+.note-list, .workflow-list, .message-list, .roster-list, .photo-grid,
+.reminder-list, .time-log, .schedule-pdf-list, .standards-list,
+.assistant-plan, .time-summary, .schedule-stats, .course-list {
+  display: flex; gap: 12px; min-height: 0; overflow-x: auto; overflow-y: hidden;
+  align-items: stretch; scroll-snap-type: x proximity; padding-bottom: 10px;
+}
+.task-list > *, .task-board > *, .suggestion-list > *, .schedule-list > *,
+.position-list > *, .note-list > *, .workflow-list > *, .message-list > *,
+.roster-list > *, .photo-grid > *, .reminder-list > *, .time-log > *,
+.schedule-pdf-list > *, .standards-list > *, .assistant-plan > *,
+.time-summary > *, .schedule-stats > *, .course-list > * {
+  flex: 0 0 92%; min-width: 0; max-height: 100%; overflow: auto; scroll-snap-align: start;
+}
+.hero-copy, .store-visual { overflow: auto; box-shadow: none; }
+.hero-copy { padding: 18px; }
+.metric { align-self: start; }
+#tasksView.active { flex-direction: column; overflow: hidden; }
+#tasksView > .filters { flex: 0 0 auto; width: 100%; max-height: none; }
+#tasksView > .form-hint { flex: 0 0 auto; width: 100%; margin: 0; }
+#tasksView > .task-board { flex: 1; width: 100%; min-height: 0; }
+#tasksView .task-card { flex-basis: min(86vw, 400px); align-content: start; }
+.filters, .segmented { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 6px; }
+.filter-chip { flex: 0 0 auto; white-space: nowrap; }
+.schedule-grid { height: 100%; min-height: 0; }
+.schedule-day { overflow: auto; }
+.operations-alert { flex: 0 0 auto; max-height: 70px; overflow: auto; margin: 0; }
+@media (max-width: 980px) {
+  .app-shell { grid-template-rows: auto minmax(0, 1fr); }
+  .sidebar { padding: 8px 12px; gap: 8px; overflow: hidden; }
+  .brand { gap: 8px; }
+  .brand-mark { width: 30px; height: 30px; font-size: 12px; }
+  .brand h1 { font-size: 16px; }
+  .brand p { display: none; }
+  .nav-list { display: flex; overflow-x: auto; gap: 6px; }
+  .nav-item { flex: 0 0 auto; width: auto; min-height: 38px; padding: 0 10px; }
+  .main { padding: 12px; gap: 8px; }
+  .topbar { flex-direction: row; align-items: center; gap: 8px; }
+  .topbar h2 { font-size: 20px; }
+  .eyebrow, .app-version { font-size: 10px; }
+  .top-actions { display: flex; flex-wrap: nowrap; gap: 6px; }
+  .top-actions button { font-size: 12px; padding: 0 8px; }
+  .store-visual { grid-template-columns: repeat(4, 1fr); }
+}

@@ -1,7 +1,7 @@
 const storageKey = 'dg-storeflow-state-v1';
 const syncConfigKey = 'dg-storeflow-sync-config-v1';
 const accessProfileKey = 'dg-storeflow-access-profile-v1';
-const appVersion = '2026.11.09.1';
+const appVersion = '2026.11.12.1';
 const ops = window.StoreFlowOperations;
 const alertSettingsKey = 'dg-storeflow-operations-alerts-v1';
 let alertsEnabled = localStorage.getItem(alertSettingsKey) === 'on';
