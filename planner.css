@@ -1,0 +1,24 @@
+#plannerView.active{display:flex;gap:18px;align-items:flex-start;overflow-x:auto;max-width:100%;padding-bottom:24px}
+#plannerView>.panel{flex:0 0 min(90vw,580px)}
+.planner-paper{flex:0 0 min(94vw,1100px);background:#fff;border:1px solid #ddd;border-radius:16px;padding:24px;min-width:320px}
+.planner-paper h2{margin-top:0}.planner-sections{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.planner-section h3{background:#272727;color:#fff;padding:8px;font-size:14px;margin:16px 0 0}
+.planner-paper table,.cleaning-paper table{border-collapse:collapse;width:100%;font-size:12px;table-layout:fixed}
+.planner-paper td,.planner-paper th,.cleaning-paper td,.cleaning-paper th{border:1px solid #aaa;padding:7px;vertical-align:top;overflow-wrap:anywhere}
+.planner-paper th{background:#f7e98d}.planner-paper td:first-child{width:52%}.planner-paper label{font-size:11px;gap:3px;margin:4px 0}.planner-paper input,.planner-paper select{max-width:100%;width:100%;padding:5px;min-width:0}
+.planner-paper small{display:block;font-size:10px;margin-top:4px}.planner-edit{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}.planner-detail{font-size:11px;color:#555;margin:5px 0}.planner-issues{background:#fff3ce;padding:12px;max-height:240px;overflow:auto}.planner-issues ul{padding-left:20px}.planner-controls textarea{width:100%}.planner-controls form{display:grid;gap:12px}.planner-controls .actions-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.truck-counts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.planner-print-only,.cleaning-paper{display:none}
+@media(max-width:700px){.planner-sections{grid-template-columns:1fr}.planner-paper{padding:12px}.planner-paper td,.planner-paper th{padding:4px}.planner-edit{grid-template-columns:1fr}}
+@media print{
+@page{size:letter portrait;margin:0.35in}
+body{background:white!important;color:black!important;font-family:Arial,sans-serif;font-size:9pt}
+body[data-print-mode] .sidebar,body[data-print-mode] .topbar,body[data-print-mode] #operationsAlert,body[data-print-mode] dialog{display:none!important}
+body[data-print-mode] .view,body[data-print-mode] .planner-controls{display:none!important}
+body[data-print-mode] .app-shell,body[data-print-mode] .main{display:block!important;padding:0!important;margin:0!important;width:100%!important;max-width:none!important;height:auto!important;overflow:visible!important}
+body[data-print-mode="daily"] #plannerView{display:block!important;overflow:visible!important}
+body[data-print-mode="daily"] #plannerPaper{display:block!important;width:100%!important;max-width:none!important;min-width:0!important;padding:0;border:0;border-radius:0}
+body[data-print-mode="cleaning"] .app-shell{display:none!important}
+body[data-print-mode="cleaning"] #cleaningPaper{display:block!important}
+.planner-sections{display:block;column-count:2;column-gap:12px}.planner-section{break-inside:avoid}.planner-paper h2,.cleaning-paper h2{font-size:16pt}.planner-section h3{background:#eee!important;color:#000!important;border:1px solid #000;padding:4px;font-size:10pt;margin-top:8px}
+.planner-paper table,.cleaning-paper table{font-size:8pt}.planner-paper th{background:#eee!important}.planner-paper td,.planner-paper th,.cleaning-paper td,.cleaning-paper th{padding:3px}
+.planner-paper input,.planner-paper select,.planner-edit,.planner-paper label,.planner-paper small{display:none!important}.planner-print-only{display:block}.planner-detail{font-size:7pt;color:#000}.planner-issues{max-height:none;overflow:visible;background:#fff!important;border:1px solid #000;font-size:8pt}.truck-counts{display:none}.planner-paper .truck-counts+ p{margin-bottom:5px}.cleaning-paper p{font-size:8pt}.cleaning-paper tr{break-inside:avoid}
+}
