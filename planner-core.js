@@ -64,7 +64,8 @@ return list;}
 const mins=t=>{const m=/^(\d{2}):(\d{2})$/.exec(t||'');return m&&+m[1]<24&&+m[2]<60?+m[1]*60 + +m[2]:NaN;};
 const time=n=>String(Math.floor(n/60)%24).padStart(2,'0')+':'+String(n%60).padStart(2,'0');
 const leader=role=>/manager|key\s*holder|lead/i.test(role||'');
-function roster(date,schedule,team){return schedule.filter(s=>s.date===date&&!/^(alicia|jeff|louis)\b/i.test(s.name)).map(s=>({...s,role:team.find(t=>t.name===s.name)?.role||s.position||'',strength:team.find(t=>t.name===s.name)?.strength||'',startMinute:mins(s.start),endMinute:mins(s.end)})).filter(s=>Number.isFinite(s.startMinute)&&s.endMinute>s.startMinute);}
+const departed=name=>/^(alicia|jeff|louis)\b/i.test(String(name||'').trim());
+function roster(date,schedule,team){return schedule.filter(s=>s.date===date&&!departed(s.name)).map(s=>({...s,role:team.find(t=>t.name===s.name)?.role||s.position||'',strength:team.find(t=>t.name===s.name)?.strength||'',startMinute:mins(s.start),endMinute:mins(s.end)})).filter(s=>Number.isFinite(s.startMinute)&&s.endMinute>s.startMinute);}
 function assign(entries,shifts,blocks=[]){
  const occupied={};const load={};
  for(const e of entries.filter(x=>x.done||x.initials||x.modInitials)){if(e.owner)(occupied[e.owner] ||= []).push([mins(e.start),mins(e.end)]);}
@@ -85,5 +86,56 @@ function validate(entries,shifts,blocks=[]){const issues=[];const active=entries
  for(const e of active){if(!e.owner){issues.push(e.title+': unassigned');continue;}const start=mins(e.start),end=mins(e.end);const s=shifts.find(x=>x.name===e.owner&&start>=x.startMinute&&end<=x.endMinute);if(!s||!(end>start)){issues.push(e.title+': outside a scheduled shift or missing time');continue;}if(e.lead&&!leader(s.role))issues.push(e.title+': requires leadership');if(end-start<e.minutes)issues.push(e.title+': time block shorter than estimated minutes');if(blocks.some(b=>b.name===e.owner&&start<mins(b.end)&&end>mins(b.start)))issues.push(e.title+': overlaps a break or coverage block');}
  for(let i=0;i<active.length;i++)for(let j=i+1;j<active.length;j++){const a=active[i],b=active[j];if(a.owner&&a.owner===b.owner&&mins(a.start)<mins(b.end)&&mins(a.end)>mins(b.start))issues.push(a.owner+': overlapping tasks ('+a.title+' / '+b.title+')');}
  return [...new Set(issues)];}
-return {isDriveline,workflow,daily,compliance,cleaning,template,templates,dayWorkflow,roster,assign,validate,mins,time,leader};
+
+/* ---- Automatic baseline drafts, weekly preparation and change review (Nov 14, 2026) ---- */
+const fixedRow=e=>!!(e.manual||e.done||e.initials||e.modInitials);
+function weekDates(date){const d=new Date(date+'T12:00:00');d.setDate(d.getDate()-((d.getDay()+1)%7));return Array.from({length:7},(_,i)=>{const x=new Date(d);x.setDate(d.getDate()+i);return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');});}
+function signature(date,schedule,team){return roster(date,schedule,team).map(s=>s.name+'|'+s.start+'|'+s.end).sort().join(';');}
+function suggestMods(shifts){const l=shifts.filter(s=>leader(s.role));const rank=r=>/assistant/i.test(r||'')?1:/manager/i.test(r||'')?0:2;const by=(f)=>l.slice().sort((a,b)=>f(a,b)||rank(a.role)-rank(b.role)||a.name.localeCompare(b.name))[0];return {openingMod:by((a,b)=>a.startMinute-b.startMinute)?.name||'',closingMod:by((a,b)=>b.endMinute-a.endMinute)?.name||''};}
+function status(p){return p.postedAt?'posted':(p.compassReviewed&&p.coverageReviewed)?'reviewed':'draft';}
+function statusLabel(p){const s=status(p);return s==='posted'?'Posted assignments':s==='reviewed'?'Reviewed':'DRAFT'+(p.compassReviewed?'':' · Compass review pending');}
+/* Build or refresh one dated plan with the single shared allocator. Returns null (never guesses) when the date has no valid shifts. */
+function buildPlan(date,ctx){
+ const {schedule,team,tasks=[],old=null,setup={},isDone=()=>false,now=new Date().toISOString()}=ctx;
+ const shifts=roster(date,schedule,team);if(!shifts.length)return null;
+ const keep=['compass','blockText','notes','handoff','preparedBy','produce','fedex','compassReviewed','coverageReviewed','openingMod','closingMod','blocks'];
+ const prev={};for(const k of keep)if(old&&old[k]!==undefined)prev[k]=old[k];
+ const s={compass:'',blockText:'',notes:'',handoff:'',preparedBy:'',produce:false,fedex:false,compassReviewed:false,coverageReviewed:false,blocks:[],...prev,...setup};
+ const notes=[];
+ const blocks=(s.blocks||[]).filter(b=>{const st=mins(b.start),en=mins(b.end);const ok=shifts.some(x=>x.name===b.name&&st>=x.startMinute&&en<=x.endMinute&&en>st);if(!ok)notes.push('Reserved block dropped (not within a scheduled shift): '+b.name+' '+b.start+'–'+b.end);return ok;});
+ const mods=suggestMods(shifts);const onShift=n=>shifts.some(x=>x.name===n);
+ const pick=(chosen,suggested,label)=>{if(chosen&&onShift(chosen))return chosen;if(chosen&&suggested!==chosen)notes.push(label+' '+chosen+' is no longer scheduled; suggested '+(suggested||'none')+'.');return suggested;};
+ const openingMod=pick(s.openingMod,mods.openingMod,'Opening MOD'),closingMod=pick(s.closingMod,mods.closingMod,'Closing MOD');
+ const entries=templates(date);
+ if(s.produce)entries.push(template.find(e=>e.key==='produce'));if(s.fedex)entries.push(template.find(e=>e.key==='rx'));
+ const vendorWork=[];
+ String(s.compass||'').split(/\n/).map(x=>x.trim()).filter(Boolean).forEach(title=>{const e={key:'compass:'+title,title,section:'Compass / ZDWF',minutes:20};if(isDriveline(e))vendorWork.push(e);else entries.push(e);});
+ for(const task of tasks.filter(t=>t.due===date&&!t.plannerDate)){const e={key:'task:'+task.id,taskId:task.id,title:task.title,notes:task.notes,section:'Existing daily tasks',minutes:20,lead:/compliance|bank|cctv|deposit/i.test(task.title),done:task.done};if(isDriveline(task))vendorWork.push(e);else if(!entries.some(x=>x.title.toLowerCase()===e.title.toLowerCase()))entries.push(e);}
+ const prior=new Map((old?.entries||[]).map(e=>[e.key,e]));
+ const merged=entries.map(e=>{const p=prior.get(e.key);return p?{...e,...p,done:isDone(p)||!!p.done}:e;});
+ for(const p of old?.entries||[])if(fixedRow({...p,done:isDone(p)||p.done})&&!merged.some(e=>e.key===p.key))merged.push({...p,done:isDone(p)||!!p.done});
+ const fixed=merged.filter(fixedRow);
+ const reserve=[...blocks,...fixed.filter(e=>e.owner&&e.start).map(e=>({name:e.owner,start:e.start,end:e.end}))];
+ const assigned=assign(merged.filter(e=>!fixed.includes(e)),shifts,reserve);
+ const byKey=new Map([...fixed,...assigned].map(e=>[e.key,e]));
+ const out=merged.map(e=>byKey.get(e.key));
+ const plan={...(old||{}),id:date,compass:s.compass,blockText:s.blockText,blocks,notes:s.notes,handoff:s.handoff,preparedBy:s.preparedBy,produce:s.produce,fedex:s.fedex,compassReviewed:!!s.compassReviewed,coverageReviewed:!!s.coverageReviewed,openingMod,closingMod,entries:out,vendorWork,truck:old?.truck||{},postedAt:null,baseline:old?old.baseline:true,generatedAt:now,scheduleSig:signature(date,schedule,team)};
+ plan.gaps=planGaps(plan,shifts,notes);return plan;}
+function planGaps(plan,shifts,notes=[]){const gaps=[...notes];
+ if(!shifts.some(s=>leader(s.role)))gaps.push('No scheduled leadership: MOD and leadership duties stay unassigned.');
+ else{if(!plan.openingMod)gaps.push('Opening MOD unassigned.');if(!plan.closingMod)gaps.push('Closing MOD unassigned.');}
+ const open=plan.entries.filter(e=>!e.owner&&!e.notApplicable&&!isDriveline(e));
+ if(open.length){const reasons=[...new Set(open.map(e=>e.reason).filter(Boolean))];gaps.push(open.length+' duty(ies) unassigned'+(reasons.length?': '+reasons.join('; '):'')+'.');}
+ return gaps;}
+/* Deliberate review of a saved plan against the current schedule. Never changes the plan. */
+function reviewIssues(plan,ctx){const shifts=roster(plan.id,ctx.schedule,ctx.team);const out=[];
+ if(plan.scheduleSig!==undefined&&plan.scheduleSig!==signature(plan.id,ctx.schedule,ctx.team))out.push({type:'schedule',text:'The imported schedule for '+plan.id+' changed since this plan was prepared.'});
+ for(const e of plan.entries){if(!e.owner||e.notApplicable||isDriveline(e))continue;const st=mins(e.start),en=mins(e.end);const ok=!departed(e.owner)&&shifts.some(x=>x.name===e.owner&&st>=x.startMinute&&en<=x.endMinute);if(!ok)out.push({type:'offshift',key:e.key,fixed:fixedRow(e),text:e.title+': '+e.owner+(departed(e.owner)?' is former staff':' is not scheduled for '+(e.start||'?')+'–'+(e.end||'?'))+(fixedRow(e)?' (signed, completed or manual: kept as-is, manager must review)':'')});}
+ return out;}
+/* Baseline drafts for every missing date of the Saturday–Friday week. Existing plans are left untouched. */
+function prepareWeek(date,ctx){const dates=weekDates(date);const plans=[],kept=[],gaps=[];
+ for(const d of dates){if((ctx.plans||[]).some(p=>p.id===d)){kept.push(d);continue;}
+  const plan=buildPlan(d,{...ctx,old:null,setup:{preparedBy:ctx.preparedBy||''}});if(plan)plans.push(plan);else gaps.push({date:d,reason:'No valid scheduled shifts: nothing assigned'});}
+ return {dates,plans,kept,gaps};}
+return {isDriveline,workflow,daily,compliance,cleaning,template,templates,dayWorkflow,roster,assign,validate,mins,time,leader,departed,fixedRow,weekDates,signature,suggestMods,status,statusLabel,buildPlan,planGaps,reviewIssues,prepareWeek};
 });
