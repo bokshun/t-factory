@@ -1,7 +1,7 @@
 const storageKey = 'dg-storeflow-state-v1';
 const syncConfigKey = 'dg-storeflow-sync-config-v1';
 const accessProfileKey = 'dg-storeflow-access-profile-v1';
-const appVersion = '2026.11.12.2';
+const appVersion = '2026.11.14.1';
 const ops = window.StoreFlowOperations;
 const alertSettingsKey = 'dg-storeflow-operations-alerts-v1';
 let alertsEnabled = localStorage.getItem(alertSettingsKey) === 'on';
@@ -168,7 +168,6 @@ const sampleState = {
     { id: 't12', name: 'Nathan H.', role: 'Sales Associate', strength: 'sales floor support' },
     { id: 't4', name: 'Blaire M.', role: 'Key Holder', strength: 'stocking and closing coverage' },
     { id: 't5', name: 'Elvis J.', role: 'Sales Associate', strength: 'recovery and closing' },
-    { id: 't6', name: 'Louis C.', role: 'Sales Associate', strength: 'core freight and sales floor support' },
     { id: 't7', name: 'Carlton R.', role: 'Sales Associate', strength: 'recovery and planogram support' },
     { id: 't8', name: 'Jazmin G.', role: 'Sales Associate', strength: 'register and truck support' },
     { id: 't13', name: 'Dominic S.', role: 'Sales Associate', strength: 'sales floor support' },
@@ -2460,6 +2459,9 @@ function photoThumb(photo) {
 }
 
 function renderSchedule() {
+  // Retain historical shifts; former staff must not appear on current/future boards.
+  const visibleSchedule = state.schedule.filter((shift) =>
+    shift.date < isoToday || !ops.inactiveStaff(shift.name));
   document.querySelectorAll('[data-schedule-week]').forEach((button) => {
     button.classList.toggle('active', Number(button.dataset.scheduleWeek) === activeScheduleWeek);
   });
@@ -2471,7 +2473,7 @@ function renderSchedule() {
   const select = document.querySelector('#schedulePdfWeek');
   select.value = String(activeScheduleWeek);
   if (!document.querySelector('#scheduleImportStart').value) document.querySelector('#scheduleImportStart').value = weekDates[0];
-  const weekShifts = state.schedule.filter((shift) => weekDates.includes(shift.date));
+  const weekShifts = visibleSchedule.filter((shift) => weekDates.includes(shift.date));
   const totalHours = weekShifts.reduce((sum, shift) => sum + getShiftHours(shift), 0);
   const people = new Set(weekShifts.map((shift) => shift.name)).size;
 
@@ -2483,7 +2485,7 @@ function renderSchedule() {
 
   document.querySelector('#scheduleGrid').innerHTML = weekDates
     .map((date) => {
-      const shifts = state.schedule
+      const shifts = visibleSchedule
         .filter((shift) => shift.date === date)
         .sort((a, b) => a.start.localeCompare(b.start));
       const dayHours = shifts.reduce((sum, shift) => sum + getShiftHours(shift), 0);

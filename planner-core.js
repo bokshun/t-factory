@@ -64,7 +64,7 @@ return list;}
 const mins=t=>{const m=/^(\d{2}):(\d{2})$/.exec(t||'');return m&&+m[1]<24&&+m[2]<60?+m[1]*60 + +m[2]:NaN;};
 const time=n=>String(Math.floor(n/60)%24).padStart(2,'0')+':'+String(n%60).padStart(2,'0');
 const leader=role=>/manager|key\s*holder|lead/i.test(role||'');
-function roster(date,schedule,team){return schedule.filter(s=>s.date===date&&!/^(alicia|jeff)\b/i.test(s.name)).map(s=>({...s,role:team.find(t=>t.name===s.name)?.role||s.position||'',strength:team.find(t=>t.name===s.name)?.strength||'',startMinute:mins(s.start),endMinute:mins(s.end)})).filter(s=>Number.isFinite(s.startMinute)&&s.endMinute>s.startMinute);}
+function roster(date,schedule,team){return schedule.filter(s=>s.date===date&&!/^(alicia|jeff|louis)\b/i.test(s.name)).map(s=>({...s,role:team.find(t=>t.name===s.name)?.role||s.position||'',strength:team.find(t=>t.name===s.name)?.strength||'',startMinute:mins(s.start),endMinute:mins(s.end)})).filter(s=>Number.isFinite(s.startMinute)&&s.endMinute>s.startMinute);}
 function assign(entries,shifts,blocks=[]){
  const occupied={};const load={};
  for(const e of entries.filter(x=>x.done||x.initials||x.modInitials)){if(e.owner)(occupied[e.owner] ||= []).push([mins(e.start),mins(e.end)]);}

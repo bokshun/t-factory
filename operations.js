@@ -28,7 +28,7 @@
   }
 
   function inactiveStaff(name) {
-    return /^(alicia|jeff)(?:\s|$)/i.test(String(name).trim());
+    return /^(alicia|jeff|louis)(?:\s|$)/i.test(String(name).trim());
   }
 
   function staffName(name) {

@@ -44,3 +44,11 @@ test('a paused timer does not count break time and resumes from its recorded ela
   assert.equal(ops.timerElapsed({ startedAt: null, elapsedMs: 61000 }, now + 600000), 61000);
   assert.equal(ops.timerElapsed({ startedAt: new Date(now).toISOString(), elapsedMs: 61000 }, now + 15000), 76000);
 });
+
+test('Louis is treated as former staff alongside Alicia and Jeff', () => {
+  assert.equal(ops.inactiveStaff('Louis C.'), true);
+  assert.equal(ops.inactiveStaff('louis'), true);
+  assert.equal(ops.inactiveStaff('Alicia'), true);
+  assert.equal(ops.inactiveStaff('Jeff'), true);
+  assert.equal(ops.inactiveStaff('Nathan H.'), false);
+});
