@@ -1,5 +1,5 @@
-const cacheName = 'dg-storeflow-v16';
-const assetVersion = '20261112-2';
+const cacheName = 'dg-storeflow-v18';
+const assetVersion = '20261114-2';
 const appShell = [
   './',
   './index.html',
