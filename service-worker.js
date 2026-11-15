@@ -1,5 +1,5 @@
-const cacheName = 'dg-storeflow-v18';
-const assetVersion = '20261114-2';
+const cacheName = 'dg-storeflow-v19';
+const assetVersion = '20261115-1';
 const appShell = [
   './',
   './index.html',
@@ -10,8 +10,11 @@ const appShell = [
   `./app.js?v=${assetVersion}`,
   `./manifest.webmanifest?v=${assetVersion}`,
   `./planner-core.js?v=${assetVersion}`,
+  `./recovery-core.js?v=${assetVersion}`,
   `./planner-ui.js?v=${assetVersion}`,
   `./planner.css?v=${assetVersion}`,
+  `./recovery-ui.js?v=${assetVersion}`,
+  `./recovery.css?v=${assetVersion}`,
   './icon.svg'
 ];
 

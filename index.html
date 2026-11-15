@@ -8,9 +8,10 @@
     <meta name="apple-mobile-web-app-title" content="StoreFlow" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>DG StoreFlow</title>
-    <link rel="manifest" href="manifest.webmanifest?v=20261114-2" />
-    <link rel="stylesheet" href="styles.css?v=20261114-2" />
-  <link rel="stylesheet" href="planner.css?v=20261114-2" />
+    <link rel="manifest" href="manifest.webmanifest?v=20261115-1" />
+    <link rel="stylesheet" href="styles.css?v=20261115-1" />
+  <link rel="stylesheet" href="planner.css?v=20261115-1" />
+  <link rel="stylesheet" href="recovery.css?v=20261115-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -25,6 +26,7 @@
 
         <nav class="nav-list">
           <button class="nav-item" data-view="planner" type="button">Daily Planner</button>
+          <button class="nav-item" data-view="recovery" type="button">Guided Recovery</button>
           <button class="nav-item active" data-view="dashboard" type="button">
             <span class="icon" aria-hidden="true">◎</span>
             Dashboard
@@ -76,6 +78,7 @@
         </header>
         <p class="board-hint">Swipe left or right through boards and cards. Use arrow keys when a lane is focused.</p>
         <p id="operationsAlert" class="operations-alert" role="status" hidden></p>
+        <p id="recoveryDueBanner" class="operations-alert recovery-due" role="status" hidden></p>
 
         <section class="view active" id="dashboardView" aria-labelledby="pageTitle">
           <div class="hero-panel">
@@ -134,6 +137,7 @@
         </section>
 
         <section class="view" id="plannerView"></section>
+        <section class="view" id="recoveryView"></section>
         <section class="view" id="tasksView">
           <div class="filters">
             <button class="filter-chip active" data-filter="all" type="button">Open</button>
@@ -517,11 +521,13 @@
     </dialog>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <div id="cleaningPaper" class="cleaning-paper"></div>
-    <script src="board-layout.js?v=20261114-2"></script>
-    <script src="planner-core.js?v=20261114-2"></script>
-    <script src="operations.js?v=20261114-2"></script>
-    <script src="sync-core.js?v=20261114-2"></script>
-    <script src="app.js?v=20261114-2"></script>
-    <script src="planner-ui.js?v=20261114-2"></script>
+    <script src="board-layout.js?v=20261115-1"></script>
+    <script src="planner-core.js?v=20261115-1"></script>
+    <script src="recovery-core.js?v=20261115-1"></script>
+    <script src="operations.js?v=20261115-1"></script>
+    <script src="sync-core.js?v=20261115-1"></script>
+    <script src="app.js?v=20261115-1"></script>
+    <script src="planner-ui.js?v=20261115-1"></script>
+    <script src="recovery-ui.js?v=20261115-1"></script>
   </body>
 </html>

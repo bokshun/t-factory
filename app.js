@@ -1,7 +1,7 @@
 const storageKey = 'dg-storeflow-state-v1';
 const syncConfigKey = 'dg-storeflow-sync-config-v1';
 const accessProfileKey = 'dg-storeflow-access-profile-v1';
-const appVersion = '2026.11.14.2';
+const appVersion = '2026.11.15.2';
 const ops = window.StoreFlowOperations;
 const alertSettingsKey = 'dg-storeflow-operations-alerts-v1';
 let alertsEnabled = localStorage.getItem(alertSettingsKey) === 'on';
@@ -259,6 +259,8 @@ const sampleState = {
   schedule: [],
   schedulePdfs: [],
   scheduleWeeks: [],
+  recoveryPlans: [],
+  recoveryEvents: [],
   compassNotes: [
     { id: 'c1', title: '7-day setup', body: 'T-Day is Thursday. Outs/Nones & Tons are Wednesday (T+6). P-Days are Tuesday and Friday. Pre-open stocking is yes. Dedicated delivery store is no.' },
     { id: 'c2', title: 'Daily reminder', body: 'Assign one owner per workflow task and check progress before shift change.' }
@@ -286,6 +288,7 @@ let currentAccess = loadAccessProfile();
 
 const views = {
   planner: document.querySelector('#plannerView'),
+  recovery: document.querySelector('#recoveryView'),
   dashboard: document.querySelector('#dashboardView'),
   tasks: document.querySelector('#tasksView'),
   inventory: document.querySelector('#inventoryView'),
@@ -297,6 +300,7 @@ const views = {
 
 const pageTitles = {
   planner: 'Daily Planner and Cleaning',
+  recovery: 'Guided Recovery',
   dashboard: 'Daily Command Center',
   tasks: 'Task Board',
   inventory: 'Event Planner',
@@ -395,6 +399,8 @@ function normalizeState(savedState) {
     ...savedState,
     team: sampleState.team,
     dailyPlans: Array.isArray(savedState.dailyPlans) ? savedState.dailyPlans : [],
+    recoveryPlans: Array.isArray(savedState.recoveryPlans) ? savedState.recoveryPlans : [],
+    recoveryEvents: Array.isArray(savedState.recoveryEvents) ? savedState.recoveryEvents : [],
     tasks: savedState.tasks || sampleState.tasks,
     schedule: normalizeSchedule(savedState.schedule || sampleState.schedule),
     schedulePdfs: savedState.schedulePdfs || [],
@@ -541,9 +547,9 @@ function isAssociateAccess() {
 }
 
 function getAllowedViews() {
-  if (isManagerAccess()) return ['dashboard', 'planner', 'tasks', 'inventory', 'schedule', 'compass', 'photos', 'team'];
-  if (isKeyholderAccess()) return ['dashboard', 'planner', 'tasks', 'schedule', 'compass', 'team'];
-  return ['tasks', 'team'];
+  if (isManagerAccess()) return ['dashboard', 'planner', 'recovery', 'tasks', 'inventory', 'schedule', 'compass', 'photos', 'team'];
+  if (isKeyholderAccess()) return ['dashboard', 'planner', 'recovery', 'tasks', 'schedule', 'compass', 'team'];
+  return ['tasks', 'recovery', 'team'];
 }
 
 function canUseManagerTools() {
@@ -926,6 +932,7 @@ async function pushCloudState(showAlert) {
     updateSyncUi('Sync error');
     result = { result: 'error', error };
   }
+  if (['pushed', 'nothing-to-push', 'current'].includes(result.result)) window.StoreFlowRecoveryUI?.markSynced();
   if (showAlert) alert(syncResultMessages[result.result] || result.result);
   return result;
 }
@@ -952,6 +959,7 @@ async function pullCloudState(showAlert) {
   const init = document.querySelector('#syncInit');
   if (init) init.classList.toggle('is-hidden', result.result !== 'cloud-empty');
   if (result.needsPush) scheduleCloudSave();
+  if (result.result === 'merged') window.StoreFlowRecoveryUI?.noteConflicts(result.conflicts || 0);
   if (showAlert) alert(syncResultMessages[result.result] || result.result);
   return result;
 }
@@ -1491,6 +1499,7 @@ function render() {
   renderRoster();
   renderDailyBrief();
   if (typeof window.renderDailyPlanner === 'function') window.renderDailyPlanner();
+  if (typeof window.renderRecovery === 'function') window.renderRecovery();
   refreshOperations();
   populatePhotoOwners();
   populateSchedulePdfOwners();
@@ -1754,6 +1763,8 @@ function refreshOperations() {
   const phase = ops.recoveryAt(now);
   const recovery = document.querySelector('#recoveryPhase');
   if (recovery) recovery.textContent = phase.join(' — ');
+  // Guided Recovery: the in-app banner always updates; sound/notification only fires while the app is open and alerts are on.
+  window.StoreFlowRecoveryUI?.tick(now, alertsEnabled ? postOperationsAlert : null);
   if (!alertsEnabled) return;
   const ring = (id, title, detail) => {
     if (firedAlerts.has(id)) return;
