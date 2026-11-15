@@ -30,6 +30,20 @@ A **Guided Recovery** view (all roles) for the 5 p.m.-to-close recovery. Nothing
 
 **Print**: "Print recovery plan" uses the native print dialog. The same dated recovery section is embedded in the printed Daily Planner for that date, with staff, zone order, instructions, carryover detail, unfinished handoff, progress/initials/MOD boxes and a sign-off line.
 
+## Shift hours, breaks and register coverage
+
+Recovery timing is checked against each employee's own free time, never just the route start:
+
+- **Free time** = scheduled shift ∩ 5 p.m.-to-close, minus register/customer coverage and breaks entered in the Daily Planner, minus any planner duty already assigned to that person. Windows shorter than 15 minutes are not counted.
+- **Start, Resume and Change section are refused** (and their buttons disabled) while the employee is on a break, on register coverage, before their recovery time begins, after their shift ends, or on a different date from the plan. The message says why and until when. **Pause, Finish and Flag are always available**, so a break or the end of a shift can always be recorded. A manager correcting a record is audited as a manager action instead of being blocked.
+- Staff see "free until HH:MM — next reserved: …, pause or finish before then" at all times.
+- **Recorded time counts only inside free windows.** If someone forgets to pause, the minutes that overlapped a break, coverage or off-shift time are kept as "excluded" (shown to staff and managers) and are not counted as recovery work. Without timing data nothing is altered.
+- Managers get a timing panel when a section is still running during a break or coverage, or after the shift ended, and when excluded minutes exist. Nothing is stopped or reassigned automatically.
+- The in-app due banner and alert appear only while the employee is actually free and at or after their start time, so they do not fire on a break or after the shift.
+- Route start must fall in a free window; a coverage block added later is flagged for review rather than silently moved.
+- Suggested owners are weighted by free minutes, so someone with 30 free minutes is not handed an equal share, and anyone with no free time is left out with a visible reason.
+- The printed plan lists each person's free windows and the reserved duties kept in view. Next-day suggestions use the new day's breaks, coverage and shifts.
+
 ## Data and sync
 
 Two new arrays in the existing synced board (no database migration, no new service):
@@ -40,9 +54,10 @@ Events carry a unique operation id, so a retry cannot record the same move or co
 
 ## Verification
 
-Automated (`node --test tests/*.test.js`, 63 tests):
+Automated (`node --test tests/*.test.js`, 83 tests):
 - `tests/recovery.test.js` (21): eligibility and reserved duties, starter route, required destination/disposition/note, Other validation, conflicts and collaboration, pause/finish, ownership rules, duplicate-retry safety, flag, MOD verification, deferral, the Saturday→Sunday carryover example, idempotent rebuilds, chained carryover, gaps, schedule-change review.
-- `tests/recovery-ui.test.js` (18): the real UI script driven through a simulated DOM — manager draft/post, no auto-posting, banner and alert, the guided flow with every rejection message, pending sync and failed saves, manager progress, next-day preparation, printable output, audit on reassign.
+- `tests/recovery-timing.test.js` (13): shift hours, breaks and coverage regressions (free windows, availability now, refused Start/Resume/Change, always-allowed Pause/Finish, excluded time, running-through-break and after-shift flags, manager audit, wrong date, capacity-weighted suggestions, review after a coverage change, next-day timing). These fail against the earlier build.
+- `tests/recovery-ui.test.js` (25, including 7 timing regressions that also fail against the earlier UI): the real UI script driven through a simulated DOM — manager draft/post, no auto-posting, banner and alert, the guided flow with every rejection message, pending sync and failed saves, manager progress, next-day preparation, printable output, audit on reassign.
 - Existing operations, planner, planner UI and sync suites still pass unchanged.
 
 Also checked in desktop Chrome (headless): the app loads with the new view, renders at desktop and phone width on screen, and prints the recovery plan and the Daily Planner with the embedded recovery section to PDF without clipped rows.

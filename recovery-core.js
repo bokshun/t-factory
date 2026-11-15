@@ -75,6 +75,43 @@
     return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
   }
 
+  /* ---------- timing: shift hours, breaks and register coverage ---------- */
+
+  const pad2 = (n) => String(n).padStart(2, '0');
+  function localParts(iso) {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return null;
+    return { date: d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()), minute: d.getHours() * 60 + d.getMinutes() };
+  }
+  /* Free windows as absolute milliseconds for one date, so recorded intervals can be clipped to them. */
+  function windowsMap(date, staff) {
+    const [y, m, d] = date.split('-').map(Number);
+    const base = new Date(y, m - 1, d).getTime();
+    const out = {};
+    for (const rec of staff || []) out[rec.name] = rec.free.map((w) => [base + w.start * 60000, base + w.end * 60000]);
+    return out;
+  }
+  /* Where is this employee RIGHT NOW relative to their shift, breaks and coverage?
+     state: free | reserved | before | after | unscheduled | wrongday. Starting or resuming work is only allowed when free. */
+  function availabilityNow(date, rec, nowIso) {
+    if (!rec) return { state: 'unscheduled', text: 'You are not scheduled from 5 p.m. to close on ' + date + '.' };
+    const t = localParts(nowIso);
+    if (!t) return { state: 'unknown', text: 'Could not read the current time.' };
+    if (t.date !== date) return { state: 'wrongday', text: 'This recovery plan is for ' + date + ', not today.' };
+    const m = t.minute;
+    const win = rec.free.find((w) => m >= w.start && m < w.end);
+    if (win) {
+      const nextBusy = rec.busy.find((b) => b.start >= m) || null;
+      const shiftEnd = Math.max(...rec.shifts.map((s) => s.endMinute));
+      return { state: 'free', until: hhmm(win.end), nextBusy, shiftEnd: hhmm(shiftEnd), text: '' };
+    }
+    const busy = rec.busy.find((b) => m >= b.start && m < b.end);
+    const later = rec.free.find((w) => w.start > m);
+    if (busy) return { state: 'reserved', reason: busy.reason, until: later ? hhmm(later.start) : hhmm(busy.end), text: 'You are reserved for ' + busy.reason + ' until ' + (later ? hhmm(later.start) : hhmm(busy.end)) + '. Starting, resuming or changing a section is unavailable until then.' };
+    if (later) return { state: 'before', until: hhmm(later.start), text: 'Recovery time for you starts at ' + hhmm(later.start) + '.' };
+    return { state: 'after', text: 'Your scheduled shift has ended. Pause or finish what you have open; do not start new work.' };
+  }
+
   /* ---------- plan structure ---------- */
 
   const zoneId = (planId, key) => planId + ':' + key;
@@ -144,7 +181,9 @@
       if (next.routes.some((r) => r.zoneKeys.includes(z.key))) continue;
       if (!staff.length) { next.reasons[z.key] = 'No scheduled, available staff from 5 p.m. to close'; continue; }
       const preferred = prefer[z.key] && staff.find((s) => s.name === prefer[z.key]);
-      const pick = preferred || staff.slice().sort((a, b) => load(a.name) - load(b.name) || a.free[0].start - b.free[0].start || a.name.localeCompare(b.name))[0];
+      const capacity = (s) => s.free.reduce((sum, w) => sum + (w.end - w.start), 0);
+      // Weight by free minutes so someone with 30 free minutes is not given as many sections as someone free all evening.
+      const pick = preferred || staff.slice().sort((a, b) => (load(a.name) + 1) / capacity(a) - (load(b.name) + 1) / capacity(b) || a.free[0].start - b.free[0].start || a.name.localeCompare(b.name))[0];
       let route = routeOf(next, pick.name);
       if (!route) { route = { id: routeId(next.id, pick.name), owner: pick.name, start: pick.from, zoneKeys: [] }; next.routes.push(route); }
       route.zoneKeys.push(z.key);
@@ -221,27 +260,39 @@
     return zones;
   }
 
-  function progress(plan, events, nowIso) {
+  function progress(plan, events, nowIso, opts) {
     const now = Date.parse(nowIso || new Date().toISOString());
     const zones = new Map(allZones(plan, events).map((z) => [z.key, {
       key: z.key, name: z.name, base: S.NOT_STARTED, status: S.NOT_STARTED, workers: {}, lastWorker: '', lastAt: '', notes: [], issues: [],
-      elapsedMs: 0, moves: 0, deferred: null, verifiedBy: '', verifiedAt: '', completedBy: '', completedAt: ''
+      elapsedMs: 0, outsideMs: 0, moves: 0, deferred: null, verifiedBy: '', verifiedAt: '', completedBy: '', completedAt: ''
     }]));
     const people = new Map();
     const stats = {};
-    const st = (emp) => (stats[emp] ||= { elapsedMs: 0, pauses: 0, order: [], completed: [], flags: 0 });
+    const st = (emp) => (stats[emp] ||= { elapsedMs: 0, outsideMs: 0, pauses: 0, order: [], completed: [], flags: 0 });
     const log = [];
     const settle = (z) => {
       const states = Object.values(z.workers);
       z.status = states.includes('running') ? S.IN_PROGRESS : states.includes('paused') ? S.PAUSED : z.base;
     };
+    // Recorded work time counts only inside the employee's free windows (shift hours minus breaks, coverage and reserved duties).
+    // Anything else is kept as 'excluded' so it stays visible but is never presented as recovery work.
+    const clip = (emp, from, to) => {
+      const total = Math.max(0, to - from);
+      const w = opts && opts.windows && opts.windows[emp];
+      if (!w) return { inside: total, outside: 0 };
+      let inside = 0;
+      for (const [s0, e0] of w) inside += Math.max(0, Math.min(to, e0) - Math.max(from, s0));
+      return { inside, outside: total - inside };
+    };
+    const addTime = (emp, zone, from, to) => {
+      const c = clip(emp, from, to);
+      if (zone) { zone.elapsedMs += c.inside; zone.outsideMs += c.outside; }
+      st(emp).elapsedMs += c.inside; st(emp).outsideMs += c.outside;
+    };
     const closeInterval = (emp, at) => {
       const a = people.get(emp);
       if (a && a.running && a.since) {
-        const z = zones.get(a.zoneKey);
-        const dur = Math.max(0, Date.parse(at) - Date.parse(a.since));
-        if (z) z.elapsedMs += dur;
-        st(emp).elapsedMs += dur;
+        addTime(emp, zones.get(a.zoneKey), Date.parse(a.since), Date.parse(at));
         a.running = false; a.since = null;
       }
     };
@@ -310,10 +361,7 @@
     // Provisional elapsed time for work running right now (only counted from an explicit start/resume).
     for (const [emp, a] of people) {
       if (a.running && a.since) {
-        const z = zones.get(a.zoneKey);
-        const dur = Math.max(0, now - Date.parse(a.since));
-        if (z) z.elapsedMs += dur;
-        st(emp).elapsedMs += dur;
+        addTime(emp, zones.get(a.zoneKey), Date.parse(a.since), now);
       }
     }
     const who = {};
@@ -335,9 +383,9 @@
   }
 
   /* req: { action, actor, actorIsManager, employee, opId, zoneKey, toKey, otherName, disposition, note, reason, ackCollab, confirm } */
-  function check(plan, events, req, nowIso) {
+  function check(plan, events, req, nowIso, opts) {
     const errors = [];
-    const prog = progress(plan, events, nowIso);
+    const prog = progress(plan, events, nowIso, opts);
     const employee = req.employee || req.actor;
     const act = prog.people[employee] || null;
     const base = { prog, employee, errors, source: act, conflict: null, toKey: null, toName: null };
@@ -357,6 +405,12 @@
     if (req.action === 'flag') {
       if (!(act || req.zoneKey)) errors.push('Choose the section the issue is in.');
       if (!String(req.note || '').trim()) errors.push('Describe the stocking or safety issue.');
+    }
+    // Shift hours, breaks and register coverage: an employee cannot start, resume or change into work while reserved or off shift.
+    // Pause and finish stay available so a break or the end of a shift can always be recorded. A manager correcting a record is audited instead.
+    if (opts && opts.staff && ['start', 'move', 'resume'].includes(req.action) && !(req.actorIsManager && req.actor !== employee)) {
+      const a = availabilityNow(plan.id, opts.staff.find((s) => s.name === employee), nowIso);
+      if (a.state !== 'free') errors.push(a.text);
     }
     if (req.action === 'start' || req.action === 'move') {
       if (req.action === 'start' && act) errors.push('Finish or change your current section first.');
@@ -401,9 +455,9 @@
     return { ...base, ok: errors.length === 0, duplicate: false };
   }
 
-  function record(plan, events, req, nowIso) {
+  function record(plan, events, req, nowIso, opts) {
     const at = nowIso || new Date().toISOString();
-    const result = check(plan, events, req, at);
+    const result = check(plan, events, req, at, opts);
     if (result.duplicate) return { ok: true, duplicate: true, events, errors: [] };
     if (!result.ok) return { ok: false, errors: result.errors, conflict: result.conflict, events, source: result.source };
     const employee = result.employee;
@@ -418,7 +472,7 @@
     if (req.action === 'finish') e.disposition = 'completed';
     if (req.action === 'start') e.zoneKey = result.toKey;
     const next = [...(events || []), e];
-    const prog = progress(plan, next, at);
+    const prog = progress(plan, next, at, opts);
     const out = { ok: true, duplicate: false, events: next, event: e, errors: [] };
     if (req.action === 'finish') out.suggestNext = suggestNext(plan, prog, employee, e.zoneKey);
     return out;
@@ -451,7 +505,25 @@
       const s = staff.find((x) => x.name === r.owner);
       if (!s) out.push({ type: 'offshift', owner: r.owner, text: r.owner + ' is not scheduled from 5 p.m. to close on ' + plan.id + '. Review ' + r.zoneKeys.length + ' section(s).' });
       else if (!s.available) out.push({ type: 'unavailable', owner: r.owner, text: r.owner + ' has no free time after 5 p.m. (reserved duties).' });
-      else if (P.mins(r.start) < s.free[0].start) out.push({ type: 'start', owner: r.owner, text: r.owner + ' start ' + r.start + ' is before their free time (' + s.from + ').' });
+      else if (!s.free.some((w) => P.mins(r.start) >= w.start && P.mins(r.start) < w.end)) out.push({ type: 'start', owner: r.owner, text: r.owner + ' start ' + r.start + ' is outside their free time (' + s.free.map((w) => hhmm(w.start) + '–' + hhmm(w.end)).join(', ') + '), which excludes breaks, coverage and shift hours.' });
+    }
+    return out;
+  }
+
+  /* Manager-facing timing flags from recorded activity. Nothing is changed or reassigned automatically. */
+  function timingIssues(plan, events, nowIso, opts) {
+    const prog = progress(plan, events, nowIso, opts);
+    const zones = allZones(plan, events);
+    const nm = (k) => zones.find((z) => z.key === k)?.name || k;
+    const out = [];
+    for (const [emp, a] of Object.entries(prog.people)) {
+      if (!a.running || !(opts && opts.staff)) continue;
+      const av = availabilityNow(plan.id, opts.staff.find((s) => s.name === emp), nowIso);
+      if (av.state === 'reserved') out.push({ type: 'running-reserved', employee: emp, text: emp + ' still has ' + nm(a.zoneKey) + ' running during ' + av.reason + '. That time is excluded from recovery time.' });
+      else if (av.state === 'after') out.push({ type: 'running-after-shift', employee: emp, text: emp + ' still has ' + nm(a.zoneKey) + ' running after their shift ended. That time is excluded from recovery time.' });
+    }
+    for (const [emp, s] of Object.entries(prog.stats)) {
+      if (s.outsideMs >= 60000) out.push({ type: 'excluded', employee: emp, text: Math.round(s.outsideMs / 60000) + ' min of ' + emp + '’s recorded time fell during breaks, coverage or outside the shift and is excluded.' });
     }
     return out;
   }
@@ -538,7 +610,7 @@
   return {
     START, S, DISPOSITIONS, DEFAULT_INSTRUCTION, STARTER, GENERIC_DESTINATION, slug,
     eligibleStaff, newPlan, addZone, removeZone, canRemoveZone, suggestOwners, assignZone, unassignZone, reorderZone, setRouteStart,
-    allZones, progress, statusOf, check, record, suggestNext, unfinished, deferredList, handoffLines, reviewPlan,
+    availabilityNow, windowsMap, timingIssues, allZones, progress, statusOf, check, record, suggestNext, unfinished, deferredList, handoffLines, reviewPlan,
     carryoverItems, applyCarryover, prepareNextDay, addNewPass, routeOf, zoneOf, zoneId, routeId
   };
 });

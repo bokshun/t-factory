@@ -42,3 +42,4 @@ body[data-print-mode="recovery"] #recoveryPaper{display:block!important;max-heig
 .recovery-paper-section{break-inside:auto}
 .recovery-paper-section input,.recovery-paper-section select,.recovery-paper-section button{display:none!important}
 }
+.recovery-timing{margin:6px 0;padding:6px 8px;border-radius:6px;background:#eef4fb;font-size:13px}

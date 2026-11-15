@@ -374,3 +374,103 @@ test('planner print embeds the recovery section for the same date', () => {
   const src = fs.readFileSync(require.resolve('../planner-ui.js'), 'utf8');
   assert.match(src, /StoreFlowRecoveryUI\.printHtml\(p\.id,\{embedded:true\}\)/);
 });
+
+/* ----- timing regressions: shift hours, breaks and register coverage ----- */
+const withCoverage = () => {
+  const x = harness();
+  x.state.dailyPlans.push({ id: SAT, blocks: [{ name: 'Carlton R.', start: '19:00', end: '19:30', reason: 'Break' }, { name: 'Carlton R.', start: '20:00', end: '21:00', reason: 'Register coverage' }], entries: [] });
+  x.click('prepare');
+  x.click('post');
+  x.as('Carlton R.', false);
+  return x;
+};
+const plain = (html) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+
+test('staff see their free time and the next reserved block before it starts', () => {
+  const x = withCoverage();
+  x.setNow(18, 50);
+  x.click('startNext', { zone: 'back-wall-water' });
+  assert.match(plain(x.host.innerHTML), /You are free until 19:00 — next reserved: 19:00–19:30 Break\. Pause or finish before then\./);
+});
+
+test('during a break Start, Resume and Change are disabled and refused; Pause and Finish stay available', () => {
+  const x = withCoverage();
+  x.setNow(18, 50);
+  x.click('startNext', { zone: 'back-wall-water' });
+  x.setNow(19, 10);
+  x.as('Carlton R.', false);
+  assert.match(plain(x.host.innerHTML), /reserved for Break until 19:30/);
+  assert.match(x.host.innerHTML, /data-action="change" disabled/);
+  assert.doesNotMatch(x.host.innerHTML, /data-action="pause" disabled|data-action="finish" disabled/);
+  // the manager is told the section is still running during the break
+  x.as('Chris C.', true);
+  assert.match(plain(x.host.innerHTML), /Timing — shift hours, breaks and coverage/);
+  assert.match(plain(x.host.innerHTML), /Carlton R\. still has Back wall — Water running during Break/);
+  x.as('Carlton R.', false);
+  x.click('pause');
+  assert.equal(x.state.recoveryEvents.at(-1).action, 'pause');
+  assert.match(x.host.innerHTML, /data-action="resume" disabled/);
+  const count = x.state.recoveryEvents.length;
+  x.setNow(19, 15);
+  x.click('resume');
+  assert.equal(x.state.recoveryEvents.length, count, 'resume refused during the break');
+  assert.match(plain(x.host.innerHTML), /reserved for Break until 19:30/);
+  x.setNow(19, 30);
+  x.as('Carlton R.', false);
+  x.click('resume');
+  assert.equal(x.state.recoveryEvents.at(-1).action, 'resume');
+});
+
+test('time worked through a break is excluded from recorded time and shown as excluded', () => {
+  const x = withCoverage();
+  x.setNow(18, 50);
+  x.click('startNext', { zone: 'back-wall-water' });
+  x.setNow(19, 40);
+  x.click('finish'); x.click('confirmFinish');
+  x.as('Chris C.', true);
+  const text = plain(x.host.innerHTML);
+  assert.match(text, /Carlton R\. .* 0 20 min 30 min excluded \(break, coverage or off shift\)/);
+  assert.match(text, /30 min of Carlton R\.’s recorded time fell during breaks, coverage or outside the shift/);
+});
+
+test('the due banner shows only while the employee is free: not on a break, not on coverage, not after the shift', () => {
+  const x = withCoverage();
+  const shown = (h, m) => { x.setNow(h, m); x.ui.tick(x.date(), null); return !x.banner.hidden; };
+  assert.equal(shown(16, 50), false, 'before recovery time');
+  assert.equal(shown(17, 0), true);
+  assert.equal(shown(19, 10), false, 'on break');
+  assert.equal(shown(19, 45), true);
+  assert.equal(shown(20, 30), false, 'on register coverage');
+  assert.equal(shown(21, 30), false, 'shift ended');
+});
+
+test('manager sees free and reserved time per route; start times cannot be set inside a break', () => {
+  const x = harness();
+  x.state.dailyPlans.push({ id: SAT, blocks: [{ name: 'Carlton R.', start: '19:00', end: '19:30', reason: 'Break' }, { name: 'Carlton R.', start: '20:00', end: '21:00', reason: 'Register coverage' }], entries: [] });
+  x.click('prepare');
+  const text = plain(x.host.innerHTML);
+  assert.match(text, /Free: 17:00–19:00, 19:30–20:00 · Reserved: 19:00–19:30 Break; 20:00–21:00 Register coverage/);
+  x.change('routeStart', '19:10', { owner: 'Carlton R.', type: 'time' });
+  assert.match(plain(x.host.innerHTML), /Start time must fall in a free window/);
+  assert.equal(x.plan().routes[0].start, '17:00');
+  x.change('routeStart', '19:30', { owner: 'Carlton R.', type: 'time' });
+  assert.equal(x.plan().routes[0].start, '19:30');
+});
+
+test('printed plan lists each person’s free windows and the reserved duties kept in view', () => {
+  const x = withCoverage();
+  x.as('Chris C.', true);
+  const html = x.ui.printHtml(SAT);
+  assert.match(plain(html), /Carlton R\. · start 17:00 · free 17:00–19:00, 19:30–20:00/);
+  assert.match(plain(html), /reserved: 19:00–19:30 Break; 20:00–21:00 Register coverage/);
+});
+
+test('an employee off shift for recovery is refused even if the app is opened late', () => {
+  const x = withCoverage();
+  x.setNow(21, 30);
+  x.as('Carlton R.', false);
+  assert.match(plain(x.host.innerHTML), /Your scheduled shift has ended/);
+  assert.match(x.host.innerHTML, /data-action="startNext"[^>]* disabled/);
+  x.click('startNext', { zone: 'back-wall-water' });
+  assert.equal(x.state.recoveryEvents.length, 0);
+});

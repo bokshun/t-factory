@@ -25,6 +25,8 @@
   const isMgr = () => canUseManagerTools();
   const nowIso = () => new Date().toISOString();
   const newOp = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'op-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+  /* Shift hours, breaks and register coverage for a date. Passed to the core so work can only start inside free time. */
+  const timingFor = (date) => { const staff = R.eligibleStaff(date, ctx(date)); return { staff, windows: R.windowsMap(date, staff) }; };
   const dailyPlan = (date) => (state.dailyPlans || []).find((p) => p.id === date) || null;
   const ctx = (date) => ({ schedule: state.schedule, team: state.team, dailyPlan: dailyPlan(date || selectedDate), now: nowIso() });
 
@@ -83,7 +85,7 @@
     const active = prog.people[who];
     const src = active ? R.allZones(plan, evs).find((z) => z.key === active.zoneKey) : null;
     const f = ui.fields;
-    const preview = R.check(plan, evs, { ...previewRequest(plan, who), opId: '' }, nowIso());
+    const preview = R.check(plan, evs, { ...previewRequest(plan, who), opId: '' }, nowIso(), timingFor(plan.id));
     const conflict = preview.conflict;
     return `<form id="recoveryChange" class="recovery-form" novalidate>
 <h4>${ui.mode === 'change' ? 'Change section' : 'Choose your next section'}</h4>
@@ -104,7 +106,8 @@ ${ui.errors.length ? `<ul class="recovery-errors" role="alert">${ui.errors.map((
     if (!who) return '<div class="panel recovery-staff"><p>Open StoreFlow with your name to see your recovery route.</p></div>';
     if (!plan || !plan.postedAt) return `<div class="panel recovery-staff"><h3>Your recovery route</h3><p>${plan ? 'The manager has not posted the recovery plan for ' + h(plan.id) + ' yet.' : 'No recovery plan for ' + h(selectedDate) + '.'}</p></div>`;
     if (!route) return `<div class="panel recovery-staff"><h3>Your recovery route</h3><p>You have no recovery route on ${h(plan.id)}.</p></div>`;
-    const prog = R.progress(plan, evs, nowIso());
+    const timing = timingFor(plan.id);
+    const prog = R.progress(plan, evs, nowIso(), timing);
     const zones = R.allZones(plan, evs);
     const zone = (k) => zones.find((z) => z.key === k);
     const active = prog.people[who];
@@ -112,6 +115,11 @@ ${ui.errors.length ? `<ul class="recovery-errors" role="alert">${ui.errors.map((
     const nextKey = nextPlanned(plan, prog, who);
     const nxt = nextKey ? zone(nextKey) : null;
     const curSt = cur ? prog.zones.get(cur.key) : null;
+    const rec = timing.staff.find((x) => x.name === who);
+    const av = R.availabilityNow(plan.id, rec, nowIso());
+    const free = av.state === 'free';
+    const dis = free ? '' : ' disabled';
+    const timingLine = timingNote(av);
     const dueNow = !evs.some((e) => e.planId === plan.id && e.employee === who) && route.start <= hhmmNow() && plan.id === ops.dateKey();
     const buttons = [];
     if (ui.mode === 'finish') {
@@ -121,22 +129,31 @@ ${ui.errors.length ? `<ul class="recovery-errors" role="alert">${ui.errors.map((
     } else if (ui.mode === 'change' || ui.mode === 'start') {
       buttons.push(destinationForm(plan, evs, prog, who));
     } else if (!active) {
-      buttons.push(`<div class="actions-row">${nxt ? `<button class="primary-button" data-action="startNext" data-zone="${h(nxt.key)}">Start ${h(nxt.name)}</button>` : ''}<button class="secondary-button" data-action="chooseOther">Choose another section</button></div>`);
+      buttons.push(`<div class="actions-row">${nxt ? `<button class="primary-button" data-action="startNext" data-zone="${h(nxt.key)}"${dis}>Start ${h(nxt.name)}</button>` : ''}<button class="secondary-button" data-action="chooseOther"${dis}>Choose another section</button></div>`);
     } else {
-      buttons.push(`<div class="actions-row"><button class="primary-button" data-action="finish">Finish section</button><button class="secondary-button" data-action="change">Change section</button>${active.running ? '<button class="secondary-button" data-action="pause">Pause / break</button>' : '<button class="primary-button" data-action="resume">Resume</button>'}<button class="secondary-button" data-action="flag">Flag issue</button></div>`);
+      buttons.push(`<div class="actions-row"><button class="primary-button" data-action="finish">Finish section</button><button class="secondary-button" data-action="change"${dis}>Change section</button>${active.running ? '<button class="secondary-button" data-action="pause">Pause / break</button>' : `<button class="primary-button" data-action="resume"${dis}>Resume</button>`}<button class="secondary-button" data-action="flag">Flag issue</button></div>`);
     }
     const alertLine = saveError ? `<p class="recovery-errors" role="alert">${h(saveError)}</p>` : '';
     const suggestion = alertLine + (ui.notice ? `<p role="status" class="recovery-notice">${h(ui.notice)}</p>` : '');
     return `<div class="panel recovery-staff">
 <h3>Your recovery route · ${h(plan.id)} · starts ${h(route.start)}</h3>
 ${dueNow ? `<p class="operations-alert recovery-due" role="status">Recovery is due now. Start ${h(nxt?.name || 'your first section')}.</p>` : ''}
-<p class="form-hint">${h(LIMITATION)}</p>${suggestion}
-<div class="recovery-now"><div><small>Current section</small><strong>${cur ? h(cur.name) + ' — ' + (active.running ? 'In progress' : 'Paused') : 'None'}</strong>${cur ? `<p>${h(cur.instruction)}</p><small>Recorded time ${mins(curSt.elapsedMs)}${active.running ? '' : ' (paused time is not counted)'}</small>` : ''}</div>
+${timingLine}<p class="form-hint">${h(LIMITATION)}</p>${suggestion}
+<div class="recovery-now"><div><small>Current section</small><strong>${cur ? h(cur.name) + ' — ' + (active.running ? 'In progress' : 'Paused') : 'None'}</strong>${cur ? `<p>${h(cur.instruction)}</p><small>Recorded time ${mins(curSt.elapsedMs)}${active.running ? '' : ' (paused time is not counted)'}${curSt.outsideMs >= 60000 ? ' · ' + mins(curSt.outsideMs) + ' excluded (break, coverage or outside your shift)' : ''}</small>` : ''}</div>
 <div><small>Next planned section</small><strong>${nxt ? h(nxt.name) : 'None left on your route'}</strong>${nxt ? `<p>${h(nxt.instruction)}</p>${prog.zones.get(nxt.key).notes.length ? '<small>Left from earlier today: ' + h(prog.zones.get(nxt.key).notes.map((n) => n.text).join('; ')) + '</small>' : ''}${carrySummary(nxt)}` : ''}</div></div>
 ${buttons.join('')}
 <ol class="recovery-route">${route.zoneKeys.map((k) => { const z = zone(k); const st = prog.zones.get(k); return z ? `<li><b>${label(z)}</b> — ${h(st.status)}${st.issues.length ? ' · ⚑ ' + h(st.issues.map((i) => i.text).join('; ')) : ''}${carrySummary(z)}</li>` : ''; }).join('')}</ol>
 ${pendingLine(evs.filter((e) => e.employee === who && e.planId === plan.id))}
 </div>`;
+  }
+
+  /* What the employee needs to know about their own shift, breaks and coverage before acting. */
+  function timingNote(av) {
+    if (av.state === 'free') {
+      const nb = av.nextBusy;
+      return `<p class="recovery-timing" role="status">You are free until ${h(av.until)}${nb ? ' — next reserved: ' + h(P.time(nb.start)) + '–' + h(P.time(nb.end)) + ' ' + h(nb.reason) + '. Pause or finish before then.' : '. Your shift ends at ' + h(av.shiftEnd) + '.'}</p>`;
+    }
+    return `<p class="recovery-timing recovery-conflict" role="alert">${h(av.text)}</p>`;
   }
 
   function carrySummary(z) {
@@ -158,6 +175,11 @@ ${pendingLine(evs.filter((e) => e.employee === who && e.planId === plan.id))}
   function availabilityTable(staff, plan) {
     const rows = staff.map((s) => `<tr><td>${h(s.name)}</td><td>${h(s.role)}</td><td>${h(s.shiftText)}</td><td>${s.available ? h(s.from) : '<b>Unavailable</b>'}</td><td>${h(s.busy.map((b) => P.time(b.start) + '–' + P.time(b.end) + ' ' + b.reason).join('; ') || '—')}</td><td>${plan && R.routeOf(plan, s.name) ? R.routeOf(plan, s.name).zoneKeys.length + ' section(s)' : '—'}</td></tr>`).join('');
     return `<table class="recovery-table"><thead><tr><th>Employee</th><th>Role</th><th>Shift</th><th>Free from</th><th>Reserved duties kept in view</th><th>Route</th></tr></thead><tbody>${rows || '<tr><td colspan="6"><b>No active employee is scheduled from 5 p.m. to close.</b></td></tr>'}</tbody></table>`;
+  }
+
+  function freeLine(rec) {
+    if (!rec) return '<p class="form-hint"><b>Not scheduled from 5 p.m. to close</b> — review this route.</p>';
+    return '<p class="form-hint">Free: ' + (rec.free.map((w) => P.time(w.start) + '–' + P.time(w.end)).join(', ') || 'none') + (rec.busy.length ? ' · Reserved: ' + rec.busy.map((b) => P.time(b.start) + '–' + P.time(b.end) + ' ' + b.reason).join('; ') : '') + '</p>';
   }
 
   function ownerOptions(staff, value) {
@@ -183,7 +205,7 @@ ${pendingLine(evs.filter((e) => e.employee === who && e.planId === plan.id))}
       const s = prog.stats[n] || { elapsedMs: 0, pauses: 0, order: [], completed: [], flags: 0 };
       const act = prog.people[n];
       const route = R.routeOf(plan, n);
-      return `<tr><td>${h(n)}</td><td>${act ? h(nm(act.zoneKey)) + (act.running ? '' : ' (paused)') : '—'}</td><td>${h(s.completed.map(nm).join(', ') || '—')}</td><td>${h(s.order.map(nm).join(' → ') || 'No activity recorded')}</td><td>${s.pauses}</td><td>${mins(s.elapsedMs)}</td><td>${s.flags}</td><td>${h((route?.zoneKeys || []).filter((k) => !['Employee complete', 'MOD verified'].includes(prog.zones.get(k)?.status)).map(nm).join(', ') || '—')}</td></tr>`;
+      return `<tr><td>${h(n)}</td><td>${act ? h(nm(act.zoneKey)) + (act.running ? '' : ' (paused)') : '—'}</td><td>${h(s.completed.map(nm).join(', ') || '—')}</td><td>${h(s.order.map(nm).join(' → ') || 'No activity recorded')}</td><td>${s.pauses}</td><td>${mins(s.elapsedMs)}${s.outsideMs >= 60000 ? '<small>' + mins(s.outsideMs) + ' excluded (break, coverage or off shift)</small>' : ''}</td><td>${s.flags}</td><td>${h((route?.zoneKeys || []).filter((k) => !['Employee complete', 'MOD verified'].includes(prog.zones.get(k)?.status)).map(nm).join(', ') || '—')}</td></tr>`;
     }).join('');
     const moves = evs.filter((e) => e.planId === plan.id).slice().reverse().slice(0, 40).map((e) => `<li>${h(fmtTime(e.at))} · ${h(e.employee)}${e.byManager ? ' (by ' + h(e.actor) + ')' : ''} · ${h(e.action)}${e.fromKey ? ' · from ' + h(nm(e.fromKey)) : ''}${e.toKey ? ' → ' + h(e.toName || nm(e.toKey)) : ''}${e.disposition ? ' · ' + h(R.DISPOSITIONS[e.disposition] || e.disposition) : ''}${e.note ? ' · “' + h(e.note) + '”' : ''}${e.reason ? ' · reason: ' + h(e.reason) : ''}${e.collaboration ? ' · collaborating' : ''}${e.action === 'reassign' ? ' · ' + h(e.fromOwner || 'unassigned') + ' → ' + h(e.toOwner) : ''}${pendingIds().has(e.id) ? ' · ⏳ pending sync' : ''}</li>`).join('');
     return `<table class="recovery-table"><thead><tr><th>Employee</th><th>Current section</th><th>Completed</th><th>Actual order</th><th>Pauses</th><th>Recorded time</th><th>Issues</th><th>Unfinished</th></tr></thead><tbody>${rows || '<tr><td colspan="8">No activity recorded yet.</td></tr>'}</tbody></table>
@@ -193,7 +215,9 @@ ${pendingLine(evs.filter((e) => e.employee === who && e.planId === plan.id))}
   function managerPanel(plan, evs) {
     const c = ctx();
     const staff = R.eligibleStaff(selectedDate, c);
-    const prog = plan ? R.progress(plan, evs, nowIso()) : null;
+    const timing = plan ? timingFor(plan.id) : null;
+    const prog = plan ? R.progress(plan, evs, nowIso(), timing) : null;
+    const timingFlags = plan ? R.timingIssues(plan, evs, nowIso(), timing) : [];
     const review = plan ? R.reviewPlan(plan, c) : [];
     const zones = plan ? R.allZones(plan, evs) : [];
     const owned = new Map();
@@ -201,8 +225,9 @@ ${pendingLine(evs.filter((e) => e.employee === who && e.planId === plan.id))}
     const body = plan ? `
 ${plan.gaps?.length ? `<div class="planner-gaps"><b>Gaps / follow-up:</b><ul>${plan.gaps.map((g) => '<li>' + h(g) + '</li>').join('')}</ul></div>` : ''}
 ${review.length ? `<div class="planner-issues"><b>Review needed:</b><ul>${review.map((x) => '<li>' + h(x.text) + '</li>').join('')}</ul></div>` : ''}
+${timingFlags.length ? `<div class="planner-issues" role="alert"><b>Timing — shift hours, breaks and coverage:</b><ul>${timingFlags.map((x) => '<li>' + h(x.text) + '</li>').join('')}</ul></div>` : ''}
 ${plan.starterApplied ? '<p class="form-hint">Starter example for Carlton (Water → Kitchen → Paper products → Pet aisle) is editable. It is an example route, not a verified store map or a permanent assignment.</p>' : ''}
-${plan.routes.map((r) => `<section class="recovery-route-block"><h4>${h(r.owner)} <label>Start <input type="time" data-field="routeStart" data-owner="${h(r.owner)}" value="${h(r.start)}"></label></h4>
+${plan.routes.map((r) => `<section class="recovery-route-block"><h4>${h(r.owner)} <label>Start <input type="time" data-field="routeStart" data-owner="${h(r.owner)}" value="${h(r.start)}"></label></h4>${freeLine(staff.find((x) => x.name === r.owner))}
 <table class="recovery-table"><thead><tr><th>#</th><th>Section and instruction</th><th>Assigned</th><th>Status</th><th>Order / actions</th></tr></thead><tbody>${r.zoneKeys.map((k, i) => { const z = zones.find((x) => x.key === k); return z ? zoneRow(plan, evs, prog, staff, z, r.owner, i, r.zoneKeys.length) : ''; }).join('')}</tbody></table></section>`).join('')}
 ${zones.some((z) => !owned.has(z.key)) ? `<section class="recovery-route-block"><h4>Unassigned sections</h4><table class="recovery-table"><thead><tr><th>#</th><th>Section and instruction</th><th>Assigned</th><th>Status</th><th>Actions</th></tr></thead><tbody>${zones.filter((z) => !owned.has(z.key)).map((z, i, a) => zoneRow(plan, evs, prog, staff, z, '', i, a.length)).join('')}</tbody></table></section>` : ''}
 <form id="recoveryAddZone" class="recovery-form" novalidate><h4>Add a recovery section</h4><div class="two-col"><label>Section name<input data-field="zoneName" value="${h(ui.fields.zoneName || '')}" placeholder="e.g. Aisle 4 — Snacks"></label><label>Department / aisle label (optional)<input data-field="zoneDept" value="${h(ui.fields.zoneDept || '')}"></label></div><label>Store-specific direction (optional; default shown to staff otherwise)<input data-field="zoneInstruction" value="${h(ui.fields.zoneInstruction || '')}" placeholder="${h(R.DEFAULT_INSTRUCTION)}"></label>${ui.errors.length && ui.mode === 'addZone' ? `<ul class="recovery-errors" role="alert">${ui.errors.map((e) => '<li>' + h(e) + '</li>').join('')}</ul>` : ''}<div class="actions-row"><button type="submit" class="secondary-button" data-action="addZone">Add section</button></div></form>
@@ -225,10 +250,10 @@ ${availabilityTable(staff, plan)}${body}${plan ? pendingLine(evs.filter((e) => e
     const plan = plans().find((p) => p.id === date);
     if (!plan) return opts.embedded ? '' : '<p>No recovery plan for ' + h(date) + '.</p>';
     const evs = events();
-    const prog = R.progress(plan, evs, nowIso());
-    const zones = R.allZones(plan, evs);
     const c = ctx(date);
     const staff = R.eligibleStaff(date, c);
+    const prog = R.progress(plan, evs, nowIso(), { staff, windows: R.windowsMap(date, staff) });
+    const zones = R.allZones(plan, evs);
     const rows = (r) => r.zoneKeys.map((k, i) => { const z = zones.find((x) => x.key === k); const st = prog.zones.get(k); if (!z) return ''; return `<tr><td>${i + 1}</td><td><b>${h(z.name)}</b>${z.department ? ' <small>' + h(z.department) + '</small>' : ''}${z.carry ? `<small>CARRYOVER from ${h(z.carryOrigin.planId)} · last: ${h(z.carry.lastWorker || '—')} ${h(fmtDate(z.carry.lastAt))} ${h(fmtTime(z.carry.lastAt))}${z.carry.notes.length ? ' · remaining: ' + h(z.carry.notes.join('; ')) : ''}${z.carry.issues.length ? ' · issues: ' + h(z.carry.issues.join('; ')) : ''}</small>` : ''}</td><td>${h(z.instruction)}</td><td>${h(st.status)}${st.lastWorker && st.status !== S.NOT_STARTED ? '<small>' + h(st.lastWorker) + '</small>' : ''}</td><td>Progress: ☐ started ☐ partial ☐ done<br>Initials: _____ &nbsp; MOD: _____</td></tr>`; }).join('');
     const unassigned = zones.filter((z) => !plan.routes.some((r) => r.zoneKeys.includes(z.key)));
     const open = R.handoffLines(plan, evs, nowIso());
@@ -237,7 +262,7 @@ ${availabilityTable(staff, plan)}${body}${plan ? pendingLine(evs.filter((e) => e
 <p>Planned route. Staff may change sections; each change records a named destination and the status of the section left. Alerts work only while the app is open.</p>
 ${(plan.gaps || []).length ? '<div class="planner-gaps"><b>Gaps:</b><ul>' + plan.gaps.map((g) => '<li>' + h(g) + '</li>').join('') + '</ul></div>' : ''}
 <p><b>Staff and reserved duties:</b> ${staff.map((s) => h(s.name) + ' ' + h(s.shiftText) + (s.available ? ' (free from ' + h(s.from) + ')' : ' (unavailable)') + (s.busy.length ? ' — reserved: ' + h(s.busy.map((b) => P.time(b.start) + '–' + P.time(b.end) + ' ' + b.reason).join('; ')) : '')).join(' · ') || 'No scheduled staff after 5 p.m.'}</p>
-${plan.routes.map((r) => `<table class="recovery-print-table"><caption>${h(r.owner)} · start ${h(r.start)}</caption><colgroup><col style="width:4%"><col style="width:24%"><col style="width:32%"><col style="width:12%"><col style="width:28%"></colgroup><thead><tr><th>#</th><th>Section</th><th>Instruction</th><th>Status</th><th>Progress / verification</th></tr></thead><tbody>${rows(r)}</tbody></table>`).join('')}
+${plan.routes.map((r) => `<table class="recovery-print-table"><caption>${h(r.owner)} · start ${h(r.start)} · free ${h((staff.find((x) => x.name === r.owner)?.free || []).map((w) => P.time(w.start) + '–' + P.time(w.end)).join(', ') || 'none')}</caption><colgroup><col style="width:4%"><col style="width:24%"><col style="width:32%"><col style="width:12%"><col style="width:28%"></colgroup><thead><tr><th>#</th><th>Section</th><th>Instruction</th><th>Status</th><th>Progress / verification</th></tr></thead><tbody>${rows(r)}</tbody></table>`).join('')}
 ${unassigned.length ? `<table class="recovery-print-table"><caption>UNASSIGNED sections</caption><colgroup><col style="width:4%"><col style="width:24%"><col style="width:32%"><col style="width:12%"><col style="width:28%"></colgroup><thead><tr><th>#</th><th>Section</th><th>Instruction</th><th>Status</th><th>Reason</th></tr></thead><tbody>${unassigned.map((z, i) => `<tr><td>${i + 1}</td><td><b>${h(z.name)}</b></td><td>${h(z.instruction)}</td><td>${h(prog.zones.get(z.key).status)}</td><td>${h(plan.reasons?.[z.key] || 'No owner chosen')}</td></tr>`).join('')}</tbody></table>` : ''}
 <h4>Unfinished sections for the closing/opening handoff</h4>${open.length ? '<ul>' + open.map((l) => '<li>' + h(l) + '</li>').join('') + '</ul>' : '<p>None recorded.</p>'}
 ${deferred.length ? '<p><b>Deferred:</b> ' + deferred.map((d) => h(d.name) + ' — ' + h(d.note)).join('; ') + '</p>' : ''}
@@ -262,7 +287,7 @@ ${deferred.length ? '<p><b>Deferred:</b> ' + deferred.map((d) => h(d.name) + ' �
 
   function commit(req, success) {
     const plan = current();
-    const out = R.record(plan, events(), { opId: ui.opId || newOp(), actor: me(), actorIsManager: isMgr(), ...req }, nowIso());
+    const out = R.record(plan, events(), { opId: ui.opId || newOp(), actor: me(), actorIsManager: isMgr(), ...req }, nowIso(), timingFor(plan.id));
     if (!out.ok) { ui.errors = out.errors; return false; }
     if (!out.duplicate) persistEvents(out.events, [out.event.id]);
     ui.errors = []; ui.fields = {}; ui.mode = null; ui.opId = '';
@@ -359,7 +384,7 @@ ${deferred.length ? '<p><b>Deferred:</b> ' + deferred.map((d) => h(d.name) + ' �
       case 'flag': open('flag'); break;
       case 'confirmFlag': commit({ action: 'flag', note: ui.fields.flagNote || '' }, 'Issue flagged.'); break;
       case 'confirmChange': {
-        const active = R.progress(plan, evs, nowIso()).people[who];
+        const active = R.progress(plan, evs, nowIso(), timingFor(plan.id)).people[who];
         commit({ action: active ? 'move' : 'start', toKey: ui.fields.toKey || '', otherName: ui.fields.otherName || '', disposition: ui.fields.disposition || '', note: ui.fields.note || '', reason: ui.fields.reason || '', ackCollab: !!ui.fields.ackCollab }, 'Route updated.');
         break;
       }
@@ -426,8 +451,10 @@ ${deferred.length ? '<p><b>Deferred:</b> ' + deferred.map((d) => h(d.name) + ' �
     const route = R.routeOf(plan, who);
     if (!route) return null;
     if (events().some((e) => e.planId === plan.id && e.employee === who)) return null;
+    // Due only while the employee is actually free (inside their shift, not on a break or register coverage) and at/after their start.
+    const av = R.availabilityNow(plan.id, timingFor(plan.id).staff.find((s) => s.name === who), now.toISOString());
     const hhmm = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
-    if (route.start > hhmm) return null;
+    if (av.state !== 'free' || route.start > hhmm) return null;
     const first = R.allZones(plan, events()).find((z) => z.key === route.zoneKeys[0]);
     return { plan, route, zone: first };
   }
