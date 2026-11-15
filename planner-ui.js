@@ -47,6 +47,7 @@ function renderPlan(p){const entries=values(p),issues=P.validate(entries,shifts(
 ${issues.length?`<details open class="planner-issues"><summary>${issues.length} assignment issue(s) — unassigned duties remain for manager follow-up</summary><ul>${issues.map(x=>'<li>'+h(x)+'</li>').join('')}</ul></details>`:'<p>No assignment time conflicts found. Manager must verify customer coverage.</p>'}
 <div class="planner-sections">${[...new Set(entries.map(e=>e.section))].map(section=>`<section class="planner-section"><h3>${h(section)}</h3><table><thead><tr><th>Duty / time</th><th>Assigned</th><th>Initials / MOD</th></tr></thead><tbody>${entries.filter(e=>e.section===section).map(e=>row(e)).join('')}</tbody></table></section>`).join('')}</div>
 <section class="planner-section"><h3>Driveline — vendor only, excluded from staff assignments</h3><ul>${(p.vendorWork||[]).map(v=>'<li>'+h(v.title)+'</li>').join('')||'<li>No Driveline duties entered for this date.</li>'}</ul></section>
+${window.StoreFlowRecoveryUI?window.StoreFlowRecoveryUI.printHtml(p.id,{embedded:true}):''}
 <section class="planner-section"><h3>SM notes / additional tasks</h3><p>${h(p.notes||'—')}</p><p>Prepared by: __________ &nbsp; MOD review: __________ &nbsp; Date/time: __________</p></section>
 ${truckForm(p)}
 </div>`;}

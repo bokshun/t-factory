@@ -1,0 +1,44 @@
+/* Guided Recovery: sideways on-screen board like the other views; native print for the dated plan. */
+#recoveryView.active{display:flex;gap:18px;align-items:flex-start;overflow-x:auto;max-width:100%;padding-bottom:24px}
+#recoveryView>.panel{flex:0 0 min(92vw,640px)}
+#recoveryView>.recovery-paper{flex:0 0 min(92vw,760px)}
+@media screen{#recoveryView.active{overflow-y:hidden}#recoveryView>.panel,#recoveryView>.recovery-paper{overflow-y:auto;overflow-x:hidden;max-height:100%;min-height:0}}
+.recovery-table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0}
+.recovery-table th,.recovery-table td{border:1px solid #cfd6dd;padding:5px;vertical-align:top;text-align:left}
+.recovery-table small,.recovery-print-table small{display:block;font-size:11px;color:#555;margin-top:3px}
+.recovery-table input,.recovery-table select{width:100%;min-width:0}
+.recovery-table button{margin:2px 2px 0 0}
+.recovery-form{display:grid;gap:10px;margin:10px 0;padding:10px;border:1px solid #cfd6dd;border-radius:8px}
+.recovery-form fieldset{border:1px solid #cfd6dd;border-radius:6px}
+.recovery-form textarea,.recovery-form select,.recovery-form input[type=text],.recovery-form input:not([type]){width:100%}
+.recovery-errors{margin:0;padding-left:20px;color:#a40000;font-weight:600}
+.recovery-conflict{background:#fff3ce;padding:8px;border-radius:6px;margin:0}
+.recovery-now{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:10px 0}
+.recovery-now>div{border:1px solid #cfd6dd;border-radius:8px;padding:10px}
+.recovery-now strong{display:block;font-size:16px;margin:2px 0}
+.recovery-route{padding-left:22px}
+.recovery-route li{margin:4px 0}
+.recovery-log{max-height:220px;overflow:auto;font-size:12px;padding-left:20px}
+.recovery-unfinished li{margin:6px 0}
+.recovery-unfinished input{margin:0 6px;min-width:0;width:200px;max-width:100%}
+.recovery-sync{font-size:12px}
+.recovery-notice{background:#e8f4ea;padding:8px;border-radius:6px}
+.recovery-due{font-weight:700}
+.recovery-paper{background:#fff;color:#111;padding:14px;border-radius:8px}
+.recovery-print-table{width:100%;border-collapse:collapse;margin:8px 0;font-size:12px;table-layout:fixed}
+.recovery-print-table caption{text-align:left;font-weight:700;padding:4px 0}
+.recovery-print-table th,.recovery-print-table td{border:1px solid #000;padding:4px;vertical-align:top;overflow-wrap:anywhere}
+@media(max-width:700px){.recovery-now{grid-template-columns:1fr}#recoveryView>.panel,#recoveryView>.recovery-paper{flex-basis:94vw}}
+@media print{
+body[data-print-mode] .board-hint{display:none!important}
+body[data-print-mode="recovery"] .sidebar,body[data-print-mode="recovery"] .topbar,body[data-print-mode="recovery"] #operationsAlert,body[data-print-mode="recovery"] #recoveryDueBanner,body[data-print-mode="recovery"] dialog,body[data-print-mode="recovery"] #cleaningPaper{display:none!important}
+body[data-print-mode="recovery"] #recoveryView{display:block!important;overflow:visible!important}
+body[data-print-mode="recovery"] #recoveryView>.panel{display:none!important}
+body[data-print-mode="recovery"] #recoveryPaper{display:block!important;max-height:none!important;overflow:visible!important;flex:none!important;width:100%!important;max-width:none!important;min-width:0!important;padding:0;border:0;border-radius:0}
+.recovery-print-table{font-size:8pt}
+.recovery-print-table thead{display:table-header-group}
+.recovery-print-table tr{break-inside:avoid}
+.recovery-print-table th{background:#eee!important}
+.recovery-paper-section{break-inside:auto}
+.recovery-paper-section input,.recovery-paper-section select,.recovery-paper-section button{display:none!important}
+}
