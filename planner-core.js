@@ -120,7 +120,7 @@ function buildPlan(date,ctx){
  const byKey=new Map([...fixed,...assigned].map(e=>[e.key,e]));
  const out=merged.map(e=>byKey.get(e.key));
  const plan={...(old||{}),id:date,compass:s.compass,blockText:s.blockText,blocks,notes:s.notes,handoff:s.handoff,preparedBy:s.preparedBy,produce:s.produce,fedex:s.fedex,compassReviewed:!!s.compassReviewed,coverageReviewed:!!s.coverageReviewed,openingMod,closingMod,entries:out,vendorWork,truck:old?.truck||{},postedAt:null,baseline:old?old.baseline:true,generatedAt:now,scheduleSig:signature(date,schedule,team)};
- plan.gaps=planGaps(plan,shifts,notes);return plan;}
+ plan.gaps=planGaps(plan,shifts,notes);return withSmThursday(plan,team);}
 function planGaps(plan,shifts,notes=[]){const gaps=[...notes];
  if(!shifts.some(s=>leader(s.role)))gaps.push('No scheduled leadership: MOD and leadership duties stay unassigned.');
  else{if(!plan.openingMod)gaps.push('Opening MOD unassigned.');if(!plan.closingMod)gaps.push('Closing MOD unassigned.');}
@@ -137,5 +137,56 @@ function prepareWeek(date,ctx){const dates=weekDates(date);const plans=[],kept=[
  for(const d of dates){if((ctx.plans||[]).some(p=>p.id===d)){kept.push(d);continue;}
   const plan=buildPlan(d,{...ctx,old:null,setup:{preparedBy:ctx.preparedBy||''}});if(plan)plans.push(plan);else gaps.push({date:d,reason:'No valid scheduled shifts: nothing assigned'});}
  return {dates,plans,kept,gaps};}
-return {isDriveline,workflow,daily,compliance,cleaning,template,templates,dayWorkflow,roster,assign,validate,mins,time,leader,departed,fixedRow,weekDates,signature,suggestMods,status,statusLabel,buildPlan,planGaps,reviewIssues,prepareWeek};
+
+/* ---- SM Thursday print-and-post checklist and Think Shrink review (Chris, Nov 15, 2026) ----
+   Kept apart from the allocator on purpose: this is Chris's own accountability, never assigned to a generic leader,
+   never given an invented time block, and never delegated silently. No report figures are stored or fabricated. */
+const smReports=[
+{key:'sales-plan',title:'Sales to plan / comp sales, SM sales-to-gap goal and scan engagement (last week and rolling four weeks, one sheet)'},
+{key:'compliance-training',title:'Compliance Training Report'},
+{key:'shrink-damage',title:'Total loss / shrink and damage report, including risk assessments and recommended actions'},
+{key:'pos-activity',title:'Point-of-Sale Activity by Associate (weekly and period-to-date panels)'},
+{key:'product-rotation',title:'Product Rotation Schedule (source target dates are product pull-through/expiry criteria, not an employee work deadline)'}];
+/* daily links are read-only references to the existing daily rows; Thursday reviews them and never duplicates or moves them. */
+const thinkShrink=[
+{key:'deposits',title:'Deposit log compliance verified',daily:'deposits'},
+{key:'coupons',title:'Coupon envelopes mailed'},
+{key:'cash',title:'Cash over/short controls and counseling follow-up'},
+{key:'summary',title:'Store summary daily prints'},
+{key:'training',title:'Shrink, prepaid-fraud and robbery-prevention training reviewed'},
+{key:'dsd-match',title:'DSD invoices matched'},
+{key:'damages',title:'Damage processing and disposal'},
+{key:'store-use',title:'Store-use verification'},
+{key:'eas',title:'Defensive merchandising / EAS'},
+{key:'bc-brave',title:'Business Center and BRAVE updates and conversations',daily:'clipboard'},
+{key:'condition',title:'Office and breakroom condition'},
+{key:'cctv',title:'CCTV / Weekly Store Summary video review and DSD invoice CCTV log review',daily:'cctv'},
+{key:'truck-credits',title:'Truck credits / Respond approval'},
+{key:'receiving',title:'Receiving compliance in HHT and backdoor-key verification'}];
+const isThursday=date=>new Date(date+'T12:00:00').getDay()===4;
+const isoDate=v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))&&!Number.isNaN(Date.parse(v+'T12:00:00'));
+function smOwner(team){return (team||[]).find(t=>/^store manager$/i.test(String(t.role||'').trim()))?.name||'Chris C.';}
+function newSmThursday(team){return {owner:smOwner(team),reports:Object.fromEntries(smReports.map(r=>[r.key,{asOf:'',unavailable:false,printed:false,posted:false,reviewed:false,note:''}])),think:Object.fromEntries(thinkShrink.map(t=>[t.key,{checked:false,note:''}])),delegation:null};}
+/* Add the checklist to a Thursday plan only; keeps whatever is already saved so rebuilding never duplicates or erases statuses. */
+function withSmThursday(plan,team){if(!plan||!isThursday(plan.id))return plan;const fresh=newSmThursday(team);const have=plan.smThursday||{};return {...plan,smThursday:{...fresh,...have,reports:Object.fromEntries(smReports.map(r=>[r.key,{...fresh.reports[r.key],...(have.reports||{})[r.key]}])),think:Object.fromEntries(thinkShrink.map(t=>[t.key,{...fresh.think[t.key],...(have.think||{})[t.key]}]))}};}
+/* Returns an error string, or '' after changing sm in place. Printed/Posted/Reviewed never rest on an upload and need an acknowledged source date. */
+function setReportField(sm,key,field,value,date){const r=sm?.reports?.[key];if(!r)return 'Unknown report.';
+ if(field==='asOf'){if(value&&!isoDate(value))return 'Enter the report source / as-of date.';if(value&&value>date)return 'The source date cannot be after the Thursday date.';r.asOf=value||'';if(!r.asOf){r.printed=r.posted=r.reviewed=false;}return '';}
+ if(field==='unavailable'){if(value){if(!String(r.note||'').trim())return 'Add a note saying why this report is unavailable (nothing is substituted).';r.printed=r.posted=r.reviewed=false;}r.unavailable=!!value;return '';}
+ if(field==='note'){r.note=String(value||'');return '';}
+ if(['printed','posted','reviewed'].includes(field)){if(value&&r.unavailable)return 'This report is flagged unavailable.';if(value&&!r.asOf)return 'Record the report source / as-of date before marking it '+field+'.';r[field]=!!value;return '';}
+ return 'Unknown field.';}
+function setThinkField(sm,key,field,value){const t=sm?.think?.[key];if(!t)return 'Unknown item.';if(field==='checked'){t.checked=!!value;return '';}if(field==='note'){t.note=String(value||'');return '';}return 'Unknown field.';}
+/* Delegation is deliberate and recorded; the owner never changes silently. */
+function delegateSm(sm,to,reason,by,at=new Date().toISOString()){if(!sm)return 'No checklist.';if(!String(to||'').trim())return 'Choose who receives the handoff.';if(!String(reason||'').trim())return 'A handoff reason is required.';sm.delegation={to,reason:String(reason).trim(),by:by||'',at};return '';}
+function smStatus(plan,schedule,team){const sm=plan?.smThursday;if(!sm)return null;const shifts=roster(plan.id,schedule,team);const owner=sm.owner;const onShift=shifts.some(s=>s.name===owner);
+ const reports=smReports.map(r=>({...r,...sm.reports[r.key]}));
+ return {owner,onShift,delegation:sm.delegation||null,pendingReview:!onShift,reports,unavailable:reports.filter(r=>r.unavailable).length,printed:reports.filter(r=>r.printed).length,posted:reports.filter(r=>r.posted).length,reviewed:reports.filter(r=>r.reviewed).length,thinkDone:thinkShrink.filter(t=>sm.think[t.key]?.checked).length,thinkTotal:thinkShrink.length,
+  note:onShift?'':owner+' is not scheduled on '+plan.id+': this stays pending for his review or a recorded handoff. No time block is invented.'};}
+/* One reminder task per Thursday (stable id), always owned by the Store Manager, never done by itself. */
+function smReminderTask(plan,team){if(!plan?.smThursday)return null;return {id:'smthu:'+plan.id,title:'Thursday: print and post SM reports, then Think Shrink review',owner:plan.smThursday.owner||smOwner(team),due:plan.id,notes:'Obtain the latest available version of each report from its source and print it. Track source/as-of date, Printed, Posted and Reviewed separately in the Daily Planner for '+plan.id+':\n'+smReports.map((r,i)=>(i+1)+'. '+r.title).join('\n')+'\nThen complete the Think Shrink review.',category:'compliance',priority:'high',smThursdayDate:plan.id};}
+/* A follow-up is only created after the report has a source date AND a manager has marked it reviewed, and needs a manager-written note. */
+function followUpTask(plan,key,team,owner){const sm=plan?.smThursday;const r=sm?.reports?.[key];const def=smReports.find(x=>x.key===key);if(!r||!def)return {error:'Unknown report.'};if(r.unavailable)return {error:'Report is flagged unavailable.'};if(!r.asOf)return {error:'Record the source / as-of date first.'};if(!r.reviewed)return {error:'Mark the report reviewed before creating a follow-up.'};if(!String(r.note||'').trim())return {error:'Write the follow-up note first (manager decides the action).'};
+ return {task:{id:'smfu:'+plan.id+':'+key,title:'Follow up: '+def.title.split(' (')[0],owner:owner||sm.owner||smOwner(team),due:plan.id,notes:'Report as-of '+r.asOf+'. '+r.note.trim(),category:'compliance',priority:'medium',smThursdayDate:plan.id}};}
+return {smReports,thinkShrink,isThursday,smOwner,newSmThursday,withSmThursday,setReportField,setThinkField,delegateSm,smStatus,smReminderTask,followUpTask,isDriveline,workflow,daily,compliance,cleaning,template,templates,dayWorkflow,roster,assign,validate,mins,time,leader,departed,fixedRow,weekDates,signature,suggestMods,status,statusLabel,buildPlan,planGaps,reviewIssues,prepareWeek};
 });

@@ -59,3 +59,18 @@ Plans persist in the existing synced board under `dailyPlans`, one ID per date; 
 `node --test tests/*.test.js` covers operations, planner allocation, planner UI handlers with a simulated DOM, and the existing 20-case sync suite. New cases cover the photographed cadence, only-on-shift allocation, breaks/coverage, leadership, insufficient capacity, Driveline exclusions, signed-row preservation, tomorrow's plan, idempotent posting and print action generation.
 
 JavaScript syntax checks pass. Real browser/print visual validation remains pending: local Chromium could not create its required Unix socket in this environment, and the cloud browser rejected file-protocol access. No visual print-quality claim is made from simulated-DOM tests. Review on phone/desktop and inspect the native print preview before merging.
+
+## SM Thursday print-and-post and Think Shrink review (confirmed by Chris, November 15, 2026)
+
+Every Thursday daily plan carries an **SM Thursday** section owned by the Store Manager (Chris C.). It is not part of the shared allocator: it is never given to a generic leader and never gets an invented time block.
+
+- **Five reports, tracked separately.** Sales-to-plan / comp sales / SM sales-to-gap / scan engagement; Compliance Training Report; Total loss / shrink and damage (with risk assessments and recommended actions); Point-of-Sale Activity by Associate; Product Rotation Schedule. Each has a source / as-of date, Printed, Posted, Reviewed and a follow-up note.
+- **Nothing completes by itself.** Printed, Posted and Reviewed each need a recorded source date and are never set by uploading or printing. A report that cannot be obtained is flagged *Unavailable* (a reason is required) and nothing is substituted. An earlier as-of date is legitimate; the date is shown on the print. StoreFlow reminds Chris to print official reports from their source; it does not fetch or regenerate employer reports.
+- **Think Shrink review.** The photographed checklist is preserved as 14 review lines with a note each. No company policy is added. CCTV, deposits and Business Center / clipboard remain daily duties on every daily plan; the Thursday line only shows their daily status for review. Nothing is moved to Thursday or duplicated.
+- **Saturday rotations.** The first-/second-Saturday rotational activities are not added as recurring tasks; they continue to arrive through Compass.
+- **Chris off.** The section stays visibly *PENDING* for his review. Delegation is deliberate: a recipient and reason are required and recorded with who and when. The owner field never changes silently.
+- **Posting.** Posting the Thursday plan adds one reminder task (`smthu:<date>`) owned by Chris and never marks it done; re-posting updates it in place.
+- **Follow-ups.** "Create follow-up task" is available only after the report has a source date, is marked Reviewed, and a manager has written the note. It is one stable task (`smfu:<date>:<report>`) and no disciplinary conclusion is drawn from rates or handwriting. Product-rotation target dates are source pull-through/expiry criteria, not employee work deadlines.
+- **No figures.** No October sample metrics are stored or shown as current results.
+- **Rebuild safety.** Refresh, weekly preparation and reload keep every status and note; the checklist is added only to Thursday plans, and older Thursday plans get it when opened by a manager.
+- **Print.** The section prints in the daily planner with ☐/☑ statuses; phone print preview has not been inspected.

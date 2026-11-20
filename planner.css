@@ -28,3 +28,6 @@ body[data-print-mode="cleaning"] #cleaningPaper{display:block!important}
 .cleaning-paper{page:cleaning}.cleaning-paper table{font-size:7pt}.cleaning-paper thead{display:table-header-group}.cleaning-paper th small,.cleaning-paper td small{font-size:6pt}.cleaning-paper td,.cleaning-paper th{overflow-wrap:anywhere}.planner-gaps{background:#fff!important;border:1px solid #000;font-size:8pt}.planner-flag{color:#000}
 .planner-paper tr{break-inside:avoid}
 }
+/* SM Thursday print-and-post and Think Shrink review */
+.planner-sm-thursday{margin-top:16px}.planner-sm-thursday table{width:100%}.planner-sm-thursday td input[type=text],.planner-sm-thursday td input:not([type]){width:100%}.planner-sm-thursday .planner-flag{color:#8a1c00}
+@media print{.planner-sm-thursday{break-inside:auto;margin-top:8px}.planner-sm-thursday tr{break-inside:avoid}.planner-sm-thursday button{display:none!important}.planner-sm-thursday table{font-size:8pt}.planner-sm-thursday p{font-size:8pt}}
